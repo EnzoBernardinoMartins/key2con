@@ -2,7 +2,7 @@
 
 ***What is key2con?***
 
-⌨️ An open-source Nintendo Switch CFW sysmodule/homebrew that lets you play games using a keyboard and mouse as a virtual controller. 🖱️
+⌨️ An Nintendo Switch CFW sysmodule/homebrew that lets you play games using a keyboard and mouse as a virtual controller. 🖱️
 
 ⚠️ **Tested only on emuMMC with HOS 22.5.0 and Atmosphère 1.11.2.** If you have any issues with different versions, please let me know.
 
