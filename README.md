@@ -14,7 +14,6 @@
 
 # 📝 Planned Features
 
-* [ ] Better KB&M and gamepad management with the libnx `usbHs` API
 * [ ] Link a keyboard or mouse to an independent virtual gamepad (e.g. Keyboard 2 = Virtual Pro Controller 2)
 * [ ] An overlay cursor that can be moved on the Switch screen and used to simulate touchscreen input
 * [ ] Bluetooth KB&M support (It probably won't happen.)
