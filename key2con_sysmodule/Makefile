@@ -15,6 +15,8 @@ SOURCES		:=	source
 DATA		:=	data
 INCLUDES	:=	include
 
+ARCH := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
+
 CFLAGS	:=	-g -Wall -O2 -ffunction-sections \
 			$(ARCH) $(DEFINES)
 
