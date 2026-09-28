@@ -1,14 +1,13 @@
 #include <iostream>
 #include <stdio.h>
 #include <string>
+#include <vector>
 
 #include <switch.h>
 #include "config_struct.hpp"
 #include "functions.hpp"
 
 u64 KEY2CON_PROGRAM_ID = 0x41000000000E2C00ULL;
-
-void load_config_file();
 
 int main(void)
 {
@@ -20,6 +19,10 @@ int main(void)
     hidInitialize();
     hidInitializeKeyboard();
     hidInitializeMouse();
+
+    FILE* log = fopen("sdmc:/switch/key2con/key2con_homebrew.log", "w");
+    fprintf(log, "Homebrew successfully launched!");
+    fflush(log);
 
     HidKeyboardState keyboard;
     HidMouseState mouse;
@@ -33,6 +36,13 @@ int main(void)
     bool wasSelected = false;
     bool Returned = false;
     bool wasReturned = false;
+    bool Deleted = false;
+    bool wasDeleted = false;
+    bool goUp = false;
+    bool wentUp = false;
+    bool goDown = false;
+    bool wentDown = false;
+    bool lock = true;
 
     bool Sysmodule = false;
 
@@ -51,7 +61,7 @@ int main(void)
     size_t separator;
     char line[1024];
 
-    load_config_file(config, key, value, line_string, separator, line);
+    load_config_file(log, config, key, value, line_string, separator);
 
     Result rc;
     while (appletMainLoop())
@@ -71,10 +81,39 @@ int main(void)
         // Actions
         if (input)
         {
-            if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_UpArrow))
-                gui_selection -= 1;
-            if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_DownArrow))
-                gui_selection += 1;
+            // Go Up
+            if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_UpArrow) && wentUp == false)
+            {
+                goUp = true;
+                wentUp = true;
+            }
+            else if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_UpArrow) && wentUp)
+            {
+                goUp = false;
+                wentUp = true;
+            }
+            else
+            {
+                goUp = false;
+                wentUp = false;
+            }
+
+            // Go Down
+            if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_DownArrow) && wentDown == false)
+            {
+                goDown = true;
+                wentDown = true;
+            }
+            else if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_DownArrow) && wentDown)
+            {
+                goDown = false;
+                wentDown = true;
+            }
+            else
+            {
+                goDown = false;
+                wentDown = false;
+            }
 
             // Selected
             if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_Return) && wasSelected == false)
@@ -109,20 +148,52 @@ int main(void)
                 Returned = false;
                 wasReturned = false;
             }
+
+            // Deleted
+            if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_Delete) && wasDeleted == false)
+            {
+                Deleted = true;
+                wasDeleted = true;
+            }
+            else if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_Delete) && wasDeleted)
+            {
+                Deleted = false;
+                wasDeleted = true;
+            }
+            else
+            {
+                Deleted = false;
+                wasDeleted = false;
+            }
+
+            if (goUp)
+                gui_selection -= 1;
+            if (goDown)
+                gui_selection += 1;
         }
+
+        if (waiting_for_input)
+            input = false;
+        else
+            input = true;
 
 
         if (gui_section == 0)
         {
             if (Returned)
             {
+                if (Sysmodule == true)
+                {
+                    pmshellTerminateProgram(KEY2CON_PROGRAM_ID);
+                    pmshellLaunchProgram(0, &sys_module_location, &pid);
+                }
                 break;
             }
 
             if (gui_selection < 0)
-                gui_selection = 0;
-            if (gui_selection > 2)
                 gui_selection = 2;
+            if (gui_selection > 2)
+                gui_selection = 0;
 
             if (Selected)
             {
@@ -137,6 +208,7 @@ int main(void)
                 if (gui_selection == 1)
                 {
                     gui_section = 1;
+                    gui_selection = -1;
                 }
 
                 if (gui_selection == 2)
@@ -150,89 +222,162 @@ int main(void)
         {
             if (Returned)
             {
+                rewrite_config_file(config);
                 gui_section = 0;
             }
 
-            if (gui_selection < 0)
-                gui_selection = 0;
-            if (gui_selection > 25)
+            if (gui_selection < -1)
                 gui_selection = 25;
+            if (gui_selection > 25)
+                gui_selection = -1;
+
+            HidKeyboardState temp_keyboard_state = keyboard;
+            HidMouseState temp_mouse_state = mouse;
+
+            temp_keyboard_state.keys[0] = 0;
+            temp_keyboard_state.keys[1] = 0;
+            temp_keyboard_state.keys[2] = 0;
+            temp_keyboard_state.keys[3] = 0;
+            temp_mouse_state.buttons = 0;
+
+            HidKeyboardKey key_received = static_cast<HidKeyboardKey>(0);
+            HidMouseButton button_received = static_cast<HidMouseButton>(0);
+
+            bool got_keyboard = false;
+            bool got_mouse = false;
 
             if (Selected)
             {
-                HidKeyboardState temp_keyboard_state = keyboard;
-                HidMouseState temp_mouse_state = mouse;
-
-                if (gui_section == 0)
+                if (gui_selection != -1)
                 {
+                    lock = true;
+                    waiting_for_input = true;
 
+                    while (waiting_for_input)
+                    {
+                        hidGetKeyboardStates(&keyboard, 1);
+
+                        if (lock)
+                        {
+                            while (keyboard.keys[0] != 0 || keyboard.keys[1] != 0 || keyboard.keys[2] != 0 || keyboard.keys[3] != 0 || mouse.buttons != 0)
+                            {
+                                hidGetKeyboardStates(&keyboard, 1);
+                                hidGetMouseStates(&mouse, 1);
+                            }
+                            lock = false;
+                        }
+
+
+                        for (int i = 0; i < 4; i++)
+                        {
+                            u64 new_keys = keyboard.keys[i] & ~temp_keyboard_state.keys[i];
+
+                            for (int bit = 0; bit < 64; bit++)
+                            {
+                                if (new_keys & (1ULL << bit))
+                                {
+                                    key_received = static_cast<HidKeyboardKey>(i * 64 + bit);
+
+                                    waiting_for_input = false;
+                                    got_keyboard = true;
+                                    break;
+                                }
+                            }
+
+                            if (!waiting_for_input)
+                                break;
+                        }
+
+                        u64 new_buttons = mouse.buttons & ~temp_mouse_state.buttons;
+
+                        for (int bit = 0; bit < 32; bit++)
+                        {
+                            if (new_buttons & (1ULL << bit))
+                            {
+                                button_received = static_cast<HidMouseButton>(1U << bit);
+
+                                waiting_for_input = false;
+                                got_mouse = true;
+                                break;
+                            }
+                        }
+
+                        consoleClear();
+                        printf("Waiting for input...");
+                        consoleUpdate(NULL);
+                    }
                 }
+            }
 
-                if (gui_section == 1)
+            if (gui_selection == 0) {map_config_kbm_struct(config.kb_dpad_up, config.mouse_dpad_up, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
+            if (gui_selection == 1) {map_config_kbm_struct(config.kb_dpad_down, config.mouse_dpad_down, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
+            if (gui_selection == 2) {map_config_kbm_struct(config.kb_dpad_left, config.mouse_dpad_left, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
+            if (gui_selection == 3) {map_config_kbm_struct(config.kb_dpad_right, config.mouse_dpad_right, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
+            if (gui_selection == 4) {map_config_kbm_struct(config.kb_button_b, config.mouse_button_b, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}            
+            if (gui_selection == 5) {map_config_kbm_struct(config.kb_button_a, config.mouse_button_a, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}            
+            if (gui_selection == 6) {map_config_kbm_struct(config.kb_button_y, config.mouse_button_y, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}            
+            if (gui_selection == 7) {map_config_kbm_struct(config.kb_button_x, config.mouse_button_x, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}            
+            if (gui_selection == 8) {map_config_kbm_struct(config.kb_button_L, config.mouse_button_L, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}            
+            if (gui_selection == 9) {map_config_kbm_struct(config.kb_button_R, config.mouse_button_R, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
+            if (gui_selection == 10) {map_config_kbm_struct(config.kb_button_ZL, config.mouse_button_ZL, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
+            if (gui_selection == 11) {map_config_kbm_struct(config.kb_button_ZR, config.mouse_button_ZR, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
+            if (gui_selection == 12) {map_config_kbm_struct(config.kb_button_minus, config.mouse_button_minus, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
+            if (gui_selection == 13) {map_config_kbm_struct(config.kb_button_plus, config.mouse_button_plus, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
+            if (gui_selection == 14) {map_config_kbm_struct(config.kb_button_capture, config.mouse_button_capture, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
+            if (gui_selection == 15) {map_config_kbm_struct(config.kb_button_home, config.mouse_button_home, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
+            if (gui_selection == 16) {map_config_kbm_struct(config.kb_stick_l_press, config.mouse_stick_l_press, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
+            if (gui_selection == 17) {map_config_kb_struct(config.kb_stick_l_up, key_received, button_received, Selected, Deleted, got_keyboard);}
+            if (gui_selection == 18) {map_config_kb_struct(config.kb_stick_l_down, key_received, button_received, Selected, Deleted, got_keyboard);}
+            if (gui_selection == 19) {map_config_kb_struct(config.kb_stick_l_left, key_received, button_received, Selected, Deleted, got_keyboard);}
+            if (gui_selection == 20) {map_config_kb_struct(config.kb_stick_l_right, key_received, button_received, Selected, Deleted, got_keyboard);}
+            if (gui_selection == 21) {map_config_kbm_struct(config.kb_stick_r_press, config.mouse_stick_r_press, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
+            if (gui_selection == 22) {map_config_kb_struct(config.kb_stick_r_up, key_received, button_received, Selected, Deleted, got_keyboard);}
+            if (gui_selection == 23) {map_config_kb_struct(config.kb_stick_r_down, key_received, button_received, Selected, Deleted, got_keyboard);}
+            if (gui_selection == 24) {map_config_kb_struct(config.kb_stick_r_left, key_received, button_received, Selected, Deleted, got_keyboard);}
+            if (gui_selection == 25) {map_config_kb_struct(config.kb_stick_r_right, key_received, button_received, Selected, Deleted, got_keyboard);}
+        }
+
+        if (gui_section == 2)
+        {
+            if (gui_selection < 0)
+                gui_selection = 2;
+            if (gui_selection > 2)
+                gui_selection = 0;
+
+            if (Returned)
+            {
+                rewrite_config_file(config);
+                gui_section = 0;
+            }
+
+            if (gui_selection == 0)
+            {
+                if (Selected)
                 {
-
+                    if (config.mouse_controls_rStick)
+                        config.mouse_controls_rStick = false;
+                    else
+                        config.mouse_controls_rStick = true;
                 }
-                
-                if (gui_section == 2)
+            }
+
+            if (gui_selection == 1)
+            {
+                if (Selected)
                 {
-
+                    if (config.mouse_controls_gyro)
+                        config.mouse_controls_gyro = false;
+                    else
+                        config.mouse_controls_gyro = true;
                 }
-                
-                if (gui_section == 3)
-                {
+            }
 
-                }
-                
-                if (gui_section == 4)
-                {
-
-                }
-                
-                if (gui_section == 5)
-                {
-
-                }
-                
-                if (gui_section == 6)
-                {
-
-                }
-                
-                if (gui_section == 7)
-                {
-
-                }
-                
-                if (gui_section == 8)
-                {
-
-                }
-                
-                if (gui_section == 9)
-                {
-
-                }
-                
-                if (gui_section == 10)
-                {
-
-                }
-                
-                if (gui_section == 11)
-                {
-
-                }
-                
-                if (gui_section == 12)
-                {
-
-                }
-                
-                if (gui_section == 13)
-                {
-
-                }
-                
+            if (gui_selection == 2)
+            {
+                if (Selected)
+                    config.mouse_sensitivity += 0.10f;
+                if (Deleted)
+                    config.mouse_sensitivity -= 0.10f;
             }
         }
 
@@ -257,7 +402,7 @@ int main(void)
                 printf("> ");
             printf("Config. <");
         }
-        
+
         else if (gui_section == 1)
         {
             printf("    Control Mapping\n\n");
@@ -277,10 +422,10 @@ int main(void)
 
             if (gui_selection == 4)
                 printf("> ");
-            printf("Button A: %s\n", keyboard_mouse_vectors_to_string(config.kb_button_b, config.mouse_button_b).c_str());
+            printf("Button B: %s\n", keyboard_mouse_vectors_to_string(config.kb_button_b, config.mouse_button_b).c_str());
             if (gui_selection == 5)
                 printf("> ");
-            printf("Button B: %s\n", keyboard_mouse_vectors_to_string(config.kb_button_a, config.mouse_button_a).c_str());
+            printf("Button A: %s\n", keyboard_mouse_vectors_to_string(config.kb_button_a, config.mouse_button_a).c_str());
             if (gui_selection == 6)
                 printf("> ");
             printf("Button Y: %s\n", keyboard_mouse_vectors_to_string(config.kb_button_y, config.mouse_button_y).c_str());
@@ -349,12 +494,34 @@ int main(void)
 
         else if (gui_section == 2)
         {
-            
+            printf("    Configuration\n\n");
+
+            if (gui_selection == 0)
+                printf("> ");
+            printf("Mouse as R-Stick: ");
+            if (config.mouse_controls_rStick)
+                printf("ON\n");
+            else
+                printf("OFF\n");
+
+            if (gui_selection == 1)
+                printf("> ");
+            printf("Mouse as Gyro: ");
+            if (config.mouse_controls_gyro)
+                printf("ON\n");
+            else
+                printf("OFF\n");
+
+            if (gui_selection == 2)
+                printf("> ");
+            printf("Mouse Sensivity: ");
+            printf("%s\n", std::to_string(config.mouse_sensitivity).c_str());
         }
 
         consoleUpdate(NULL);
     }
 
+    fclose(log);
     pmdmntExit();
     pmshellExit();
     hidExit();

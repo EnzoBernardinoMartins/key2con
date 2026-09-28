@@ -60,6 +60,7 @@ void __appInit(void)
 
 void __appExit(void)
 {
+    hiddbgExit();
     fsdevUnmountAll();
     fsExit(); 
     hidExit();

@@ -115,10 +115,11 @@ std::string keyboard_mouse_vectors_to_string(const std::vector<HidKeyboardKey>& 
     return result;
 };
 
-void load_config_file(Config& config, std::string& key, std::string& value,
-    std::string& line_string, size_t& separator, char line[])
+void load_config_file(FILE* log, Config& config, std::string& key, std::string& value,
+    std::string& line_string, size_t& separator)
 {
-    FILE* config_file = fopen("sdmc:/config/key2con/config.txt", "a+");
+    char line[1024];
+    FILE* config_file = fopen("sdmc:/config/key2con/config.txt", "r");
     while (fgets(line, sizeof(line), config_file) != NULL)
     {
         line_string = std::string(line);
@@ -234,37 +235,36 @@ void load_config_file(Config& config, std::string& key, std::string& value,
     fclose(config_file);
 };
 
-void rewrite_config_file(Config& config, const std::vector<HidKeyboardKey>& keys = {},
-    const std::vector<HidMouseButton>& buttons = {})
+void rewrite_config_file(Config& config)
 {
     FILE* config_file = fopen("sdmc:/config/key2con/config.txt", "w");
 
-    fprintf(config_file, "dpad_up = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "dpad_down = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "dpad_left = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "dpad_right = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "button_b = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "button_a = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "button_y = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "button_x = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "button_L = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "button_R = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "button_ZL = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "button_ZR = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "button_minus = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "button_plus = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "button_capture = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "button_home = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "stick_l_press = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "stick_l_up = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "stick_l_down = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "stick_l_left = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "stick_l_right = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "stick_r_press = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "stick_r_up = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "stick_r_down = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "stick_r_left = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
-    fprintf(config_file, "stick_r_right = %s\n", keyboard_mouse_vectors_to_string(keys, buttons).c_str());
+    fprintf(config_file, "dpad_up = %s\n", keyboard_mouse_vectors_to_string(config.kb_dpad_up, config.mouse_dpad_up).c_str());
+    fprintf(config_file, "dpad_down = %s\n", keyboard_mouse_vectors_to_string(config.kb_dpad_down, config.mouse_dpad_down).c_str());
+    fprintf(config_file, "dpad_left = %s\n", keyboard_mouse_vectors_to_string(config.kb_dpad_left, config.mouse_dpad_left).c_str());
+    fprintf(config_file, "dpad_right = %s\n", keyboard_mouse_vectors_to_string(config.kb_dpad_right, config.mouse_dpad_right).c_str());
+    fprintf(config_file, "button_b = %s\n", keyboard_mouse_vectors_to_string(config.kb_button_b, config.mouse_button_b).c_str());
+    fprintf(config_file, "button_a = %s\n", keyboard_mouse_vectors_to_string(config.kb_button_a, config.mouse_button_a).c_str());
+    fprintf(config_file, "button_y = %s\n", keyboard_mouse_vectors_to_string(config.kb_button_y, config.mouse_button_y).c_str());
+    fprintf(config_file, "button_x = %s\n", keyboard_mouse_vectors_to_string(config.kb_button_x, config.mouse_button_x).c_str());
+    fprintf(config_file, "button_L = %s\n", keyboard_mouse_vectors_to_string(config.kb_button_L, config.mouse_button_L).c_str());
+    fprintf(config_file, "button_R = %s\n", keyboard_mouse_vectors_to_string(config.kb_button_R, config.mouse_button_R).c_str());
+    fprintf(config_file, "button_ZL = %s\n", keyboard_mouse_vectors_to_string(config.kb_button_ZL, config.mouse_button_ZL).c_str());
+    fprintf(config_file, "button_ZR = %s\n", keyboard_mouse_vectors_to_string(config.kb_button_ZR, config.mouse_button_ZR).c_str());
+    fprintf(config_file, "button_minus = %s\n", keyboard_mouse_vectors_to_string(config.kb_button_minus, config.mouse_button_minus).c_str());
+    fprintf(config_file, "button_plus = %s\n", keyboard_mouse_vectors_to_string(config.kb_button_plus, config.mouse_button_plus).c_str());
+    fprintf(config_file, "button_capture = %s\n", keyboard_mouse_vectors_to_string(config.kb_button_capture, config.mouse_button_capture).c_str());
+    fprintf(config_file, "button_home = %s\n", keyboard_mouse_vectors_to_string(config.kb_button_home, config.mouse_button_home).c_str());
+    fprintf(config_file, "stick_l_press = %s\n", keyboard_mouse_vectors_to_string(config.kb_stick_l_press, config.mouse_stick_l_press).c_str());
+    fprintf(config_file, "stick_l_up = %s\n", keyboard_mouse_vectors_to_string(config.kb_stick_l_up).c_str());
+    fprintf(config_file, "stick_l_down = %s\n", keyboard_mouse_vectors_to_string(config.kb_stick_l_down).c_str());
+    fprintf(config_file, "stick_l_left = %s\n", keyboard_mouse_vectors_to_string(config.kb_stick_l_left).c_str());
+    fprintf(config_file, "stick_l_right = %s\n", keyboard_mouse_vectors_to_string(config.kb_stick_l_right).c_str());
+    fprintf(config_file, "stick_r_press = %s\n", keyboard_mouse_vectors_to_string(config.kb_stick_r_press, config.mouse_stick_r_press).c_str());
+    fprintf(config_file, "stick_r_up = %s\n", keyboard_mouse_vectors_to_string(config.kb_stick_r_up).c_str());
+    fprintf(config_file, "stick_r_down = %s\n", keyboard_mouse_vectors_to_string(config.kb_stick_r_down).c_str());
+    fprintf(config_file, "stick_r_left = %s\n", keyboard_mouse_vectors_to_string(config.kb_stick_r_left).c_str());
+    fprintf(config_file, "stick_r_right = %s\n", keyboard_mouse_vectors_to_string(config.kb_stick_r_right).c_str());
 
     fprintf(config_file, "mouse_controls_gyro = %s\n", std::to_string(config.mouse_controls_gyro).c_str());
     fprintf(config_file, "mouse_controls_rStick = %s\n", std::to_string(config.mouse_controls_rStick).c_str());
@@ -272,3 +272,44 @@ void rewrite_config_file(Config& config, const std::vector<HidKeyboardKey>& keys
 
     fclose(config_file);
 };
+
+void map_config_kbm_struct(std::vector<HidKeyboardKey>& keys,
+    std::vector<HidMouseButton>& buttons,
+    HidKeyboardKey key_received, HidMouseButton button_received,
+    bool Selected, bool Deleted, bool got_keyboard, bool got_mouse)
+{
+    if (Selected)
+    {
+        if (got_keyboard)
+            keys.push_back(key_received);
+        if (got_mouse)
+            buttons.push_back(button_received);
+    }
+
+    if (Deleted)
+    {
+        if (!buttons.empty())
+            buttons.pop_back();
+        else if (!keys.empty())
+            keys.pop_back();
+
+    }
+}
+
+void map_config_kb_struct(std::vector<HidKeyboardKey>& keys,
+    HidKeyboardKey key_received, HidMouseButton button_received,
+    bool Selected, bool Deleted, bool got_keyboard)
+{
+    if (Selected)
+    {
+        if (got_keyboard)
+            keys.push_back(key_received);
+    }
+
+    if (Deleted)
+    {
+        if (!keys.empty())
+            keys.pop_back();
+
+    }
+}
