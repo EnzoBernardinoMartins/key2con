@@ -2,7 +2,7 @@
 
 ***What is key2con?***
 
-⌨️ An Nintendo Switch CFW sysmodule/homebrew that lets you play games using a keyboard and mouse as a virtual controller. 🖱️
+⌨️ A Nintendo Switch CFW sysmodule/homebrew that lets you play games using a keyboard and mouse as a virtual controller. 🖱️
 
 ⚠️ **Tested only on emuMMC with HOS 22.5.0 and Atmosphère 1.11.2.** If you have any issues with different versions, please let me know.
 
@@ -10,10 +10,11 @@
 
 * Play any Switch game with a USB keyboard and mouse
 * Map any KB&M key/button to gamepad buttons or sticks using the key2con Homebrew
-* Experimental gyro/R-stick-as-mouse support
+* Experimental gyro/R-stick-as-mouse/L-stick-as-mouse support
 
 # 📝 Planned Features
 
+* [ ] Mapping profiles per game
 * [ ] Link a keyboard or mouse to an independent virtual gamepad (e.g. Keyboard 2 = Virtual Pro Controller 2)
 * [ ] An overlay cursor that can be moved on the Switch screen and used to simulate touchscreen input
 * [ ] Bluetooth KB&M support (It probably won't happen.)
@@ -71,6 +72,7 @@ stick_r_left =
 stick_r_right =
 mouse_controls_gyro =
 mouse_controls_rStick =
+mouse_controls_lStick =
 mouse_sensitivity =
 ```
 
