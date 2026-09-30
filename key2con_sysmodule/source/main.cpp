@@ -3,6 +3,7 @@
 #include <string.h>
 #include <iostream>
 #include "config.hpp"
+#include "functions.hpp"
 
 #include <switch.h>
 
@@ -136,7 +137,17 @@ int main(int argc, char* argv[])
     Config config;
     FILE* config_file = fopen("sdmc:/config/key2con/config.txt", "r");
     if (config_file == NULL)
-        return 1;
+    {
+        rewrite_config_file(config, true);
+        config_file = fopen("sdmc:/config/key2con/config.txt", "r");
+
+        if (config_file == NULL)
+        {
+            fprintf(log, "Error open config file\n");
+            fflush(log);
+            return 1;
+        }
+    }
 
     std::string key = "";
     std::string value = "";
