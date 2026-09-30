@@ -257,6 +257,9 @@ int main(int argc, char* argv[])
 
         if (key == "mouse_controls_rStick")
             config.mouse_controls_rStick = std::stoi(value);
+
+        if (key == "mouse_controls_lStick")
+            config.mouse_controls_lStick = std::stoi(value);
     }
     fclose(config_file);
 
@@ -342,7 +345,7 @@ int main(int argc, char* argv[])
         if (isKeyPressed(keyboard, config.kb_button_home, mouse, config.mouse_button_home))
             controller_state.buttons |= HiddbgNpadButton_Home;
 
-        // Analógico Esquerdo
+        // L stick
         if (isKeyPressed(keyboard, config.kb_stick_l_up))
             controller_state.analog_stick_l.y = 32767;
 
@@ -358,7 +361,7 @@ int main(int argc, char* argv[])
         if (isKeyPressed(keyboard, config.kb_stick_l_press, mouse, config.mouse_stick_l_press))
             controller_state.buttons |= HidNpadButton_StickL;
 
-        // Analógico Direito
+        // R stick
         if (isKeyPressed(keyboard, config.kb_stick_r_up))
             controller_state.analog_stick_r.y = 32767;
 
@@ -374,37 +377,9 @@ int main(int argc, char* argv[])
         if (isKeyPressed(keyboard, config.kb_stick_r_press, mouse, config.mouse_stick_r_press))
             controller_state.buttons |= HidNpadButton_StickR;
 
-        if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_F1))
-            controller_state.six_axis_sensor_angle.x += 10;
-
-        if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_F2))
-            controller_state.six_axis_sensor_angle.y += 10;
-
-        if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_F3))
-            controller_state.six_axis_sensor_angle.z += 10;
-
-        if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_F4)){
-            controller_state.six_axis_sensor_angle.x = 0;
-            controller_state.six_axis_sensor_angle.y = 0;
-            controller_state.six_axis_sensor_angle.z = 0;}
-
-        if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_F5))
-            controller_state.six_axis_sensor_acceleration.x += 10;
-
-        if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_F6))
-            controller_state.six_axis_sensor_acceleration.y += 10;
-
-        if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_F7))
-            controller_state.six_axis_sensor_acceleration.z += 10;
-
-        if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_F8)){
-            controller_state.six_axis_sensor_acceleration.x = 0;
-            controller_state.six_axis_sensor_acceleration.y = 0;
-            controller_state.six_axis_sensor_acceleration.z = 0;}
-
         // Mouse
 
-        // Analógico Direito
+        // Sticks
         if (config.mouse_controls_rStick)
         {
             if (isKeyPressed(keyboard, config.kb_stick_r_left) || isKeyPressed(keyboard, config.kb_stick_r_right)) {}
@@ -429,22 +404,44 @@ int main(int argc, char* argv[])
             }
         }
 
-        if (config.mouse_controls_gyro)
+        if (config.mouse_controls_lStick)
         {
-            controller_state.six_axis_sensor_acceleration.x = 0;
-            controller_state.six_axis_sensor_acceleration.y = 0;
-            controller_state.six_axis_sensor_acceleration.z = 0;
-
-            controller_state.six_axis_sensor_angle.z =
-                mouse.delta_x * 0.01f;
-
-            controller_state.six_axis_sensor_angle.x =
-                mouse.delta_y * 0.01f;
+            if (isKeyPressed(keyboard, config.kb_stick_l_left) || isKeyPressed(keyboard, config.kb_stick_l_right)) {}
+            else if (mouse.delta_x * (1280 * config.mouse_sensitivity) <= 32767 && mouse.delta_x * (1280 * config.mouse_sensitivity) >= -32767)
+                controller_state.analog_stick_l.x = mouse.delta_x * (1280 * config.mouse_sensitivity);
+            else
+            {
+                if (mouse.delta_x > 0)
+                    controller_state.analog_stick_l.x = 32767;
+                if (mouse.delta_x < 0)
+                    controller_state.analog_stick_l.x = -32767;
+            }
+            if (isKeyPressed(keyboard, config.kb_stick_l_up) || isKeyPressed(keyboard, config.kb_stick_l_down)) {}
+            else if (mouse.delta_y * (1280 * config.mouse_sensitivity) <= 32767 && mouse.delta_y * (1280 * config.mouse_sensitivity) >= -32767)
+                controller_state.analog_stick_l.y = mouse.delta_y * (-1280 * config.mouse_sensitivity);
+            else
+            {
+                if (mouse.delta_y > 0)
+                    controller_state.analog_stick_l.y = -32767;
+                if (mouse.delta_y < 0)
+                    controller_state.analog_stick_l.y = 32767;
+            }
         }
 
+        if (config.mouse_controls_gyro)
+        {
+            controller_state.attribute |= HiddbgHdlsAttribute_HasVirtualSixAxisSensorAngle;
+
+            controller_state.six_axis_sensor_acceleration = {0.0f, 0.0f, 0.0f};
+
+            constexpr float angle_per_mouse_count = 0.001f;
+
+            controller_state.six_axis_sensor_angle.z += mouse.delta_x * angle_per_mouse_count;
+            controller_state.six_axis_sensor_angle.y -= mouse.delta_y * angle_per_mouse_count;
+        }
 
         hiddbgSetHdlsState(hdls_handle, &controller_state);
-        svcSleepThread(2500000ULL);
+        svcSleepThread(1000000ULL);
     }
 
     return 0;

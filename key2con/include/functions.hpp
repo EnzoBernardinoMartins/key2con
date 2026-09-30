@@ -231,6 +231,9 @@ void load_config_file(FILE* log, Config& config, std::string& key, std::string& 
 
         if (key == "mouse_controls_rStick")
             config.mouse_controls_rStick = std::stoi(value);
+
+        if (key == "mouse_controls_lStick")
+            config.mouse_controls_lStick = std::stoi(value);
     }
     fclose(config_file);
 };
@@ -268,6 +271,7 @@ void rewrite_config_file(Config& config)
 
     fprintf(config_file, "mouse_controls_gyro = %s\n", std::to_string(config.mouse_controls_gyro).c_str());
     fprintf(config_file, "mouse_controls_rStick = %s\n", std::to_string(config.mouse_controls_rStick).c_str());
+    fprintf(config_file, "mouse_controls_lStick = %s\n", std::to_string(config.mouse_controls_lStick).c_str());
     fprintf(config_file, "mouse_sensitivity = %s", std::to_string(config.mouse_sensitivity).c_str());
 
     fclose(config_file);

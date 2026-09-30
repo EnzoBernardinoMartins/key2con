@@ -64,4 +64,5 @@ struct Config
     float mouse_sensitivity = 1.0f;
     bool mouse_controls_gyro = false;
     bool mouse_controls_rStick = false;
+    bool mouse_controls_lStick = false;
 };

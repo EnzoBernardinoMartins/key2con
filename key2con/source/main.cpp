@@ -185,7 +185,9 @@ int main(void)
                 if (Sysmodule == true)
                 {
                     pmshellTerminateProgram(KEY2CON_PROGRAM_ID);
+                    svcSleepThread(2500000ULL);
                     pmshellLaunchProgram(0, &sys_module_location, &pid);
+                    svcSleepThread(2500000ULL);
                 }
                 break;
             }
@@ -200,19 +202,29 @@ int main(void)
                 if (gui_selection == 0)
                 {
                     if (Sysmodule == false)
+                    {
+                        svcSleepThread(2500000ULL);
                         pmshellLaunchProgram(0, &sys_module_location, &pid);
+                    }
                     if (Sysmodule == true)
+                    {
+                        svcSleepThread(2500000ULL);
                         pmshellTerminateProgram(KEY2CON_PROGRAM_ID);
+                    }
                 }
 
                 if (gui_selection == 1)
                 {
+                    Selected = false;
+                    gui_selection = 0;
                     gui_section = 1;
-                    gui_selection = -1;
+                    
                 }
 
                 if (gui_selection == 2)
                 {
+                    Selected = false;
+                    gui_selection = 0;
                     gui_section = 2;
                 }
             }
@@ -223,13 +235,14 @@ int main(void)
             if (Returned)
             {
                 rewrite_config_file(config);
+                gui_selection = 0;
                 gui_section = 0;
             }
 
-            if (gui_selection < -1)
+            if (gui_selection < 0)
                 gui_selection = 25;
             if (gui_selection > 25)
-                gui_selection = -1;
+                gui_selection = 0;
 
             HidKeyboardState temp_keyboard_state = keyboard;
             HidMouseState temp_mouse_state = mouse;
@@ -248,64 +261,62 @@ int main(void)
 
             if (Selected)
             {
-                if (gui_selection != -1)
+                lock = true;
+                waiting_for_input = true;
+
+                while (waiting_for_input)
                 {
-                    lock = true;
-                    waiting_for_input = true;
+                    hidGetKeyboardStates(&keyboard, 1);
+                    hidGetMouseStates(&mouse, 1);
 
-                    while (waiting_for_input)
+                    if (lock)
                     {
-                        hidGetKeyboardStates(&keyboard, 1);
-
-                        if (lock)
+                        while (keyboard.keys[0] != 0 || keyboard.keys[1] != 0 || keyboard.keys[2] != 0 || keyboard.keys[3] != 0 || mouse.buttons != 0)
                         {
-                            while (keyboard.keys[0] != 0 || keyboard.keys[1] != 0 || keyboard.keys[2] != 0 || keyboard.keys[3] != 0 || mouse.buttons != 0)
-                            {
-                                hidGetKeyboardStates(&keyboard, 1);
-                                hidGetMouseStates(&mouse, 1);
-                            }
-                            lock = false;
+                            hidGetKeyboardStates(&keyboard, 1);
+                            hidGetMouseStates(&mouse, 1);
                         }
+                        lock = false;
+                    }
 
 
-                        for (int i = 0; i < 4; i++)
+                    for (int i = 0; i < 4; i++)
+                    {
+                        u64 new_keys = keyboard.keys[i] & ~temp_keyboard_state.keys[i];
+
+                        for (int bit = 0; bit < 64; bit++)
                         {
-                            u64 new_keys = keyboard.keys[i] & ~temp_keyboard_state.keys[i];
-
-                            for (int bit = 0; bit < 64; bit++)
+                            if (new_keys & (1ULL << bit))
                             {
-                                if (new_keys & (1ULL << bit))
-                                {
-                                    key_received = static_cast<HidKeyboardKey>(i * 64 + bit);
-
-                                    waiting_for_input = false;
-                                    got_keyboard = true;
-                                    break;
-                                }
-                            }
-
-                            if (!waiting_for_input)
-                                break;
-                        }
-
-                        u64 new_buttons = mouse.buttons & ~temp_mouse_state.buttons;
-
-                        for (int bit = 0; bit < 32; bit++)
-                        {
-                            if (new_buttons & (1ULL << bit))
-                            {
-                                button_received = static_cast<HidMouseButton>(1U << bit);
+                                key_received = static_cast<HidKeyboardKey>(i * 64 + bit);
 
                                 waiting_for_input = false;
-                                got_mouse = true;
+                                got_keyboard = true;
                                 break;
                             }
                         }
 
-                        consoleClear();
-                        printf("Waiting for input...");
-                        consoleUpdate(NULL);
+                        if (!waiting_for_input)
+                            break;
                     }
+
+                    u64 new_buttons = mouse.buttons & ~temp_mouse_state.buttons;
+
+                    for (int bit = 0; bit < 32; bit++)
+                    {
+                        if (new_buttons & (1ULL << bit))
+                        {
+                            button_received = static_cast<HidMouseButton>(1U << bit);
+
+                            waiting_for_input = false;
+                            got_mouse = true;
+                            break;
+                        }
+                    }
+
+                    consoleClear();
+                    printf("Waiting for input...");
+                    consoleUpdate(NULL);
                 }
             }
 
@@ -340,13 +351,14 @@ int main(void)
         if (gui_section == 2)
         {
             if (gui_selection < 0)
-                gui_selection = 2;
-            if (gui_selection > 2)
+                gui_selection = 3;
+            if (gui_selection > 3)
                 gui_selection = 0;
 
             if (Returned)
             {
                 rewrite_config_file(config);
+                gui_selection = 0;
                 gui_section = 0;
             }
 
@@ -361,7 +373,19 @@ int main(void)
                 }
             }
 
+
             if (gui_selection == 1)
+            {
+                if (Selected)
+                {
+                    if (config.mouse_controls_lStick)
+                        config.mouse_controls_lStick = false;
+                    else
+                        config.mouse_controls_lStick = true;
+                }
+            }
+
+            if (gui_selection == 2)
             {
                 if (Selected)
                 {
@@ -372,7 +396,7 @@ int main(void)
                 }
             }
 
-            if (gui_selection == 2)
+            if (gui_selection == 3)
             {
                 if (Selected)
                     config.mouse_sensitivity += 0.10f;
@@ -401,6 +425,14 @@ int main(void)
             if (gui_selection == 2)
                 printf("> ");
             printf("Config. <");
+            if (gui_selection == 3)
+                printf("> ");
+            printf("USB <\n");
+            for (int i = 0; i < 34; i++)
+            {
+                printf("\n");
+            }
+            printf("UpArrow = move up|DownArrow = move down|Enter = select|Esc = exit");
         }
 
         else if (gui_section == 1)
@@ -490,6 +522,11 @@ int main(void)
             if (gui_selection == 25)
                 printf("> ");
             printf("rStick Right: %s\n", keyboard_mouse_vectors_to_string(config.kb_stick_r_right).c_str());
+            for (int i = 0; i < 13; i++)
+            {
+                printf("\n");
+            }
+            printf("UpArrow=move up|DownArrow=move down|Enter=map|Esc=return|Del=remove last map");
         }
 
         else if (gui_section == 2)
@@ -506,16 +543,29 @@ int main(void)
 
             if (gui_selection == 1)
                 printf("> ");
-            printf("Mouse as Gyro: ");
-            if (config.mouse_controls_gyro)
+            printf("Mouse as L-Stick: ");
+            if (config.mouse_controls_lStick)
                 printf("ON\n");
             else
                 printf("OFF\n");
 
             if (gui_selection == 2)
                 printf("> ");
+            printf("Mouse as Gyro: ");
+            if (config.mouse_controls_gyro)
+                printf("ON\n");
+            else
+                printf("OFF\n");
+
+            if (gui_selection == 3)
+                printf("> ");
             printf("Mouse Sensivity: ");
             printf("%s\n", std::to_string(config.mouse_sensitivity).c_str());
+            for (int i = 0; i < 39; i++)
+            {
+                printf("\n");
+            }
+            printf("UpArrow=move up|DownArrow=move down|Enter=toggle/increase mouse sensitivity|Esc=return|Del=decrease mouse sensitivity");
         }
 
         consoleUpdate(NULL);
