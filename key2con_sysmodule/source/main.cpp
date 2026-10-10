@@ -2,9 +2,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <iostream>
-#include "config.hpp"
-#include "functions.hpp"
+#include <switch.h>
 
+#include "../../shared/config_struct.hpp"
+#include "../../shared/virtual_controller_device.hpp"
+#include "../../shared/functions.hpp"
+#include "../../shared/save_profile_file.hpp"
 #include <switch.h>
 
 #define INNER_HEAP_SIZE 0x80000
@@ -24,6 +27,8 @@ void __libnx_initheap(void)
     fake_heap_start = inner_heap;
     fake_heap_end   = inner_heap + sizeof(inner_heap);
 }
+
+static VirtualDevice_K2C gamepads[4];
 
 void __appInit(void)
 {
@@ -47,7 +52,6 @@ void __appInit(void)
         diagAbortWithResult(MAKERESULT(Module_Libnx, LibnxError_InitFail_HID));
 
     rc = hiddbgInitialize();
-
     if (R_FAILED(rc))
         diagAbortWithResult(rc);
 
@@ -55,17 +59,23 @@ void __appInit(void)
     if (R_FAILED(rc))
         diagAbortWithResult(MAKERESULT(Module_Libnx, LibnxError_InitFail_FS));
 
+    rc = pmdmntInitialize();
+    if (R_FAILED(rc))
+        diagAbortWithResult(rc);
+
     fsdevMountSdmc();
     smExit();
 }
 
 void __appExit(void)
 {
-    hiddbgExit();
+    hiddbgDetachHdlsVirtualDevice(gamepads[0].hdls_handle);
+    hiddbgReleaseHdlsWorkBuffer(gamepads[0].hdls_session);
     fsdevUnmountAll();
-    fsExit(); 
     hidExit();
     hiddbgExit();
+    fsExit();
+    pmdmntExit();
 }
 
 #ifdef __cplusplus 
@@ -74,44 +84,33 @@ void __appExit(void)
 
 int main(int argc, char* argv[])
 {
-
     Result rc;
-
-    HidKeyboardState keyboard;
-    HidMouseState mouse;
-
-    static s8 hdls_workmem[0x1000] __attribute__((aligned(0x1000)));
-
-    static HiddbgHdlsSessionId hdls_session = {0};
-    static HiddbgHdlsHandle hdls_handle = {0};
-
-    static HiddbgHdlsState controller_state = {0};
+    std::string current_activity = "";
 
     FILE* log = fopen("sdmc:/switch/key2con/key2con_sysmodule.log", "w");
 
     if (log == NULL)
         return 1;
 
-    rc = hiddbgAttachHdlsWorkBuffer(&hdls_session, hdls_workmem, sizeof(hdls_workmem));
+    rc = hiddbgAttachHdlsWorkBuffer(&gamepads[0].hdls_session, gamepads[0].hdls_workmem, sizeof(gamepads[0].hdls_workmem));
     if (R_FAILED(rc))
     {
         fprintf(log, "Erro no hiddbgAttachHdlsWorkBuffer! 0x%x\n", rc);
         fflush(log);
         return 1;
     }
+
     fprintf(log, "key2con initialized!");
     fflush(log);
 
-    HiddbgHdlsDeviceInfo device = {0};
+    gamepads[0].device_info.deviceType = HidDeviceType_FullKey3;
+    gamepads[0].device_info.npadInterfaceType = HidNpadInterfaceType_Bluetooth;
+    gamepads[0].device_info.colorLeftGrip = RGBA8_MAXALPHA(255, 255, 255);
+    gamepads[0].device_info.colorRightGrip = RGBA8_MAXALPHA(0, 0, 0);
+    gamepads[0].device_info.singleColorBody = RGBA8_MAXALPHA(175, 175, 175 );
+    gamepads[0].device_info.singleColorButtons = RGBA8_MAXALPHA(255, 50, 50);
 
-    device.deviceType = HidDeviceType_FullKey3;
-    device.npadInterfaceType = HidNpadInterfaceType_Bluetooth;
-    device.colorLeftGrip = RGBA8_MAXALPHA(255, 255, 255);
-    device.colorRightGrip = RGBA8_MAXALPHA(0, 0, 0);
-    device.singleColorBody = RGBA8_MAXALPHA(175, 175, 175 );
-    device.singleColorButtons = RGBA8_MAXALPHA(255, 50, 50);
-
-    rc = hiddbgAttachHdlsVirtualDevice(&hdls_handle, &device);
+    rc = hiddbgAttachHdlsVirtualDevice(&gamepads[0].hdls_handle, &gamepads[0].device_info);
     if (R_FAILED(rc))
     {
         fprintf(log, "Erro ao criar controle virtual! 0x%x\n", rc);
@@ -124,334 +123,251 @@ int main(int argc, char* argv[])
         fflush(log);
     }
 
-    controller_state.battery_level = 4;
+    gamepads[0].controller_state.battery_level = 4;
 
-    controller_state.analog_stick_l.x = 0;
-    controller_state.analog_stick_l.y = 0;
+    gamepads[0].controller_state.analog_stick_l.x = 0;
+    gamepads[0].controller_state.analog_stick_l.y = 0;
 
-    controller_state.analog_stick_r.x = 0;
-    controller_state.analog_stick_r.y = 0;
+    gamepads[0].controller_state.analog_stick_r.x = 0;
+    gamepads[0].controller_state.analog_stick_r.y = 0;
 
-    // Carregar a configuração
+    // Gamepads config file check
 
-    Config config;
-    FILE* config_file = fopen("sdmc:/config/key2con/config.txt", "r");
-    if (config_file == NULL)
+    FILE* gamepads_file = fopen("sdmc:/config/key2con/gamepads.txt", "r");
+    if (gamepads_file == NULL)
     {
-        rewrite_config_file(config, true);
-        config_file = fopen("sdmc:/config/key2con/config.txt", "r");
+        gamepads_file = fopen("sdmc:/config/key2con/gamepads.txt", "w");
+        rewrite_gamepads_file(gamepads_file, gamepads, true);
+        fclose(gamepads_file);
+        gamepads_file = fopen("sdmc:/config/key2con/gamepads.txt", "r");
 
-        if (config_file == NULL)
+        if (gamepads_file == NULL)
         {
-            fprintf(log, "Error open config file\n");
+            fprintf(log, "Error open/create gamepads file\n");
             fflush(log);
             return 1;
         }
     }
 
-    std::string key = "";
-    std::string value = "";
-    std::string line_string = "";
-    size_t separator;
+    load_gamepads_file(gamepads_file, gamepads);
+    fclose(gamepads_file);
 
-    char line[1024];
-    while (fgets(line, sizeof(line), config_file) != NULL)
+    FILE* config_file = fopen(gamepads[0].profile_path.c_str(), "r");
+    if (config_file == NULL)
     {
-        line_string = std::string(line);
-        separator = line_string.find("=");
-        key = trim(line_string.substr(0, separator));
-        value = trim(line_string.substr(separator + 1));
-        fprintf(log, "Key: %s Value: %s", key.c_str(), value.c_str());
-        fflush(log);
+        rewrite_config_file(gamepads[0].profile_path.c_str(), {}, true);
+        config_file = fopen(gamepads[0].profile_path.c_str(), "r");
 
-        if (key == "dpad_up"){
-            config.kb_dpad_up = get_keyboard_vector(value, ',');
-            config.mouse_dpad_up = get_mouse_vector(value, ',');}
-
-        if (key == "dpad_down"){
-            config.kb_dpad_down = get_keyboard_vector(value, ',');
-            config.mouse_dpad_down = get_mouse_vector(value, ',');}
-
-        if (key == "dpad_left"){
-            config.kb_dpad_left = get_keyboard_vector(value, ',');
-            config.mouse_dpad_left = get_mouse_vector(value, ',');}
-
-        if (key == "dpad_right"){
-            config.kb_dpad_right = get_keyboard_vector(value, ',');
-            config.mouse_dpad_right = get_mouse_vector(value, ',');}
-
-        if (key == "button_b"){
-            config.kb_button_b = get_keyboard_vector(value, ',');
-            config.mouse_button_b = get_mouse_vector(value, ',');}
-
-        if (key == "button_a"){
-            config.kb_button_a = get_keyboard_vector(value, ',');
-            config.mouse_button_a = get_mouse_vector(value, ',');}
-
-        if (key == "button_y"){
-            config.kb_button_y = get_keyboard_vector(value, ',');
-            config.mouse_button_y = get_mouse_vector(value, ',');}
-
-        if (key == "button_x"){
-            config.kb_button_x = get_keyboard_vector(value, ',');
-            config.mouse_button_x = get_mouse_vector(value, ',');}
-
-        if (key == "button_L"){
-            config.kb_button_L = get_keyboard_vector(value, ',');
-            config.mouse_button_L = get_mouse_vector(value, ',');}
-
-        if (key == "button_R"){
-            config.kb_button_R = get_keyboard_vector(value, ',');
-            config.mouse_button_R = get_mouse_vector(value, ',');}
-
-        if (key == "button_ZL"){
-            config.kb_button_ZL = get_keyboard_vector(value, ',');
-            config.mouse_button_ZL = get_mouse_vector(value, ',');}
-
-        if (key == "button_ZR"){
-            config.kb_button_ZR = get_keyboard_vector(value, ',');
-            config.mouse_button_ZR = get_mouse_vector(value, ',');}
-
-        if (key == "button_minus"){
-            config.kb_button_minus = get_keyboard_vector(value, ',');
-            config.mouse_button_minus = get_mouse_vector(value, ',');}
-
-        if (key == "button_plus"){
-            config.kb_button_plus = get_keyboard_vector(value, ',');
-            config.mouse_button_plus = get_mouse_vector(value, ',');}
-
-        if (key == "button_capture"){
-            config.kb_button_capture = get_keyboard_vector(value, ',');
-            config.mouse_button_capture = get_mouse_vector(value, ',');}
-
-        if (key == "button_home"){
-            config.kb_button_home = get_keyboard_vector(value, ',');
-            config.mouse_button_home = get_mouse_vector(value, ',');}
-
-        if (key == "stick_l_press"){
-            config.kb_stick_l_press = get_keyboard_vector(value, ',');
-            config.mouse_stick_l_press = get_mouse_vector(value, ',');}
-
-        if (key == "stick_l_up")
-            config.kb_stick_l_up = get_keyboard_vector(value, ',');
-
-        if (key == "stick_l_down")
-            config.kb_stick_l_down = get_keyboard_vector(value, ',');
-
-        if (key == "stick_l_left")
-            config.kb_stick_l_left = get_keyboard_vector(value, ',');
-
-        if (key == "stick_l_right")
-            config.kb_stick_l_right = get_keyboard_vector(value, ',');
-
-        if (key == "stick_r_press"){
-            config.kb_stick_r_press = get_keyboard_vector(value, ',');
-            config.mouse_stick_r_press = get_mouse_vector(value, ',');}
-
-        if (key == "stick_r_up")
-            config.kb_stick_r_up = get_keyboard_vector(value, ',');
-
-        if (key == "stick_r_down")
-            config.kb_stick_r_down = get_keyboard_vector(value, ',');
-
-        if (key == "stick_r_left")
-            config.kb_stick_r_left = get_keyboard_vector(value, ',');
-
-        if (key == "stick_r_right")
-            config.kb_stick_r_right = get_keyboard_vector(value, ',');
-
-        if (key == "mouse_sensitivity")
-            config.mouse_sensitivity = std::stof(value);
-
-        if (key == "mouse_controls_gyro")
-            config.mouse_controls_gyro = std::stoi(value);
-
-        if (key == "mouse_controls_rStick")
-            config.mouse_controls_rStick = std::stoi(value);
-
-        if (key == "mouse_controls_lStick")
-            config.mouse_controls_lStick = std::stoi(value);
+        if (config_file == NULL)
+        {
+            fprintf(log, "Error open/create config file\n");
+            fflush(log);
+            return 1;
+        }
     }
     fclose(config_file);
 
+    load_config_file(log, gamepads[0].current_map, gamepads[0].profile_path, "global");
+
+    u64 pid = 0;
+    u64 program_id = 0;
+    u64 old_program_id = 0;
+    char title_id_str[17];
+
     while (true)
     {
-        hidGetKeyboardStates(&keyboard, 1);
-        hidGetMouseStates(&mouse, 1);
+        hidGetKeyboardStates(&gamepads[0].keyboard, 1);
+        hidGetMouseStates(&gamepads[0].mouse, 1);
 
-        controller_state.buttons = 0;
-        controller_state.analog_stick_l.x = 0;
-        controller_state.analog_stick_l.y = 0;
-        controller_state.analog_stick_r.x = 0;
-        controller_state.analog_stick_r.y = 0;
+        gamepads[0].controller_state.buttons = 0;
+        gamepads[0].controller_state.analog_stick_l.x = 0;
+        gamepads[0].controller_state.analog_stick_l.y = 0;
+        gamepads[0].controller_state.analog_stick_r.x = 0;
+        gamepads[0].controller_state.analog_stick_r.y = 0;
 
+        // Load the global or game map
+        pid = 0;
+        program_id = 0;
+
+        Result rc = pmdmntGetApplicationProcessId(&pid);
+
+        if (R_SUCCEEDED(rc) && pid != 0)
+        {
+            rc = pmdmntGetProgramId(&program_id, pid);
+            sprintf(title_id_str, "%016lX", program_id);
+        }
+
+        if (old_program_id != program_id && pid == 0)
+            load_config_file(log, gamepads[0].current_map, gamepads[0].profile_path, "global");
+
+        if (old_program_id != program_id && pid != 0)
+            load_config_file(log, gamepads[0].current_map, gamepads[0].profile_path, title_id_str);
+
+        // Attach or Detach the virtual controller
         bool isConnected = false;
-        hiddbgIsHdlsVirtualDeviceAttached(hdls_session, hdls_handle, &isConnected);
+        hiddbgIsHdlsVirtualDeviceAttached(gamepads[0].hdls_session, gamepads[0].hdls_handle, &isConnected);
         if (!isConnected)
         {
-            if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_LeftGui))
-            {
-                hiddbgAttachHdlsVirtualDevice(&hdls_handle, &device);
-            }
+            if (hidKeyboardStateGetKey(&gamepads[0].keyboard, HidKeyboardKey_LeftGui))
+                hiddbgAttachHdlsVirtualDevice(&gamepads[0].hdls_handle, &gamepads[0].device_info);
         }
         else
         {
-            if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_End))
-            {
-                hiddbgDetachHdlsVirtualDevice(hdls_handle);
-            }
+            if (hidKeyboardStateGetKey(&gamepads[0].keyboard, HidKeyboardKey_End))
+                hiddbgDetachHdlsVirtualDevice(gamepads[0].hdls_handle);
         }
 
         // Teclado
 
         // D-pad
-        if (isKeyPressed(keyboard, config.kb_dpad_up, mouse, config.mouse_dpad_up))
-            controller_state.buttons |= HidNpadButton_Up;
+        if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_dpad_up, gamepads[0].mouse, gamepads[0].current_map.mouse_dpad_up))
+            gamepads[0].controller_state.buttons |= HidNpadButton_Up;
 
-        if (isKeyPressed(keyboard, config.kb_dpad_down, mouse, config.mouse_dpad_down))
-            controller_state.buttons |= HidNpadButton_Down;
+        if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_dpad_down, gamepads[0].mouse, gamepads[0].current_map.mouse_dpad_down))
+            gamepads[0].controller_state.buttons |= HidNpadButton_Down;
 
-        if (isKeyPressed(keyboard, config.kb_dpad_left, mouse, config.mouse_dpad_left))
-            controller_state.buttons |= HidNpadButton_Left;
+        if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_dpad_left, gamepads[0].mouse, gamepads[0].current_map.mouse_dpad_left))
+            gamepads[0].controller_state.buttons |= HidNpadButton_Left;
 
-        if (isKeyPressed(keyboard, config.kb_dpad_right, mouse, config.mouse_dpad_right))
-            controller_state.buttons |= HidNpadButton_Right;
+        if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_dpad_right, gamepads[0].mouse, gamepads[0].current_map.mouse_dpad_right))
+            gamepads[0].controller_state.buttons |= HidNpadButton_Right;
 
         // BAYX
-        if (isKeyPressed(keyboard, config.kb_button_a, mouse, config.mouse_button_a))
-            controller_state.buttons |= HidNpadButton_A;
+        if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_button_a, gamepads[0].mouse, gamepads[0].current_map.mouse_button_a))
+            gamepads[0].controller_state.buttons |= HidNpadButton_A;
 
-        if (isKeyPressed(keyboard, config.kb_button_b, mouse, config.mouse_button_b))
-            controller_state.buttons |= HidNpadButton_B;
+        if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_button_b, gamepads[0].mouse, gamepads[0].current_map.mouse_button_b))
+            gamepads[0].controller_state.buttons |= HidNpadButton_B;
 
-        if (isKeyPressed(keyboard, config.kb_button_x, mouse, config.mouse_button_x))
-            controller_state.buttons |= HidNpadButton_X;
+        if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_button_x, gamepads[0].mouse, gamepads[0].current_map.mouse_button_x))
+            gamepads[0].controller_state.buttons |= HidNpadButton_X;
 
-        if (isKeyPressed(keyboard, config.kb_button_y, mouse, config.mouse_button_y))
-            controller_state.buttons |= HidNpadButton_Y;
+        if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_button_y, gamepads[0].mouse, gamepads[0].current_map.mouse_button_y))
+            gamepads[0].controller_state.buttons |= HidNpadButton_Y;
 
         // Gatilho e botões superiores
-        if (isKeyPressed(keyboard, config.kb_button_L, mouse, config.mouse_button_L))
-            controller_state.buttons |= HidNpadButton_L;
+        if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_button_L, gamepads[0].mouse, gamepads[0].current_map.mouse_button_L))
+            gamepads[0].controller_state.buttons |= HidNpadButton_L;
 
-        if (isKeyPressed(keyboard, config.kb_button_R, mouse, config.mouse_button_R))
-            controller_state.buttons |= HidNpadButton_R;
+        if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_button_R, gamepads[0].mouse, gamepads[0].current_map.mouse_button_R))
+            gamepads[0].controller_state.buttons |= HidNpadButton_R;
 
-        if (isKeyPressed(keyboard, config.kb_button_ZL, mouse, config.mouse_button_ZL))
-            controller_state.buttons |= HidNpadButton_ZL;
+        if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_button_ZL, gamepads[0].mouse, gamepads[0].current_map.mouse_button_ZL))
+            gamepads[0].controller_state.buttons |= HidNpadButton_ZL;
 
-        if (isKeyPressed(keyboard, config.kb_button_ZR, mouse, config.mouse_button_ZR))
-            controller_state.buttons |= HidNpadButton_ZR;
+        if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_button_ZR, gamepads[0].mouse, gamepads[0].current_map.mouse_button_ZR))
+            gamepads[0].controller_state.buttons |= HidNpadButton_ZR;
 
         // Botões de "interface"
-        if (isKeyPressed(keyboard, config.kb_button_plus, mouse, config.mouse_button_plus))
-            controller_state.buttons |= HidNpadButton_Plus;
+        if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_button_plus, gamepads[0].mouse, gamepads[0].current_map.mouse_button_plus))
+            gamepads[0].controller_state.buttons |= HidNpadButton_Plus;
 
-        if (isKeyPressed(keyboard, config.kb_button_minus, mouse, config.mouse_button_minus))
-            controller_state.buttons |= HidNpadButton_Minus;
+        if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_button_minus, gamepads[0].mouse, gamepads[0].current_map.mouse_button_minus))
+            gamepads[0].controller_state.buttons |= HidNpadButton_Minus;
 
-        if (isKeyPressed(keyboard, config.kb_button_capture, mouse, config.mouse_button_capture))
-            controller_state.buttons |= HiddbgNpadButton_Capture;
+        if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_button_capture, gamepads[0].mouse, gamepads[0].current_map.mouse_button_capture))
+            gamepads[0].controller_state.buttons |= HiddbgNpadButton_Capture;
 
-        if (isKeyPressed(keyboard, config.kb_button_home, mouse, config.mouse_button_home))
-            controller_state.buttons |= HiddbgNpadButton_Home;
+        if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_button_home, gamepads[0].mouse, gamepads[0].current_map.mouse_button_home))
+            gamepads[0].controller_state.buttons |= HiddbgNpadButton_Home;
 
         // L stick
-        if (isKeyPressed(keyboard, config.kb_stick_l_up))
-            controller_state.analog_stick_l.y = 32767;
+        if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_stick_l_up))
+            gamepads[0].controller_state.analog_stick_l.y = 32767;
 
-        else if (isKeyPressed(keyboard, config.kb_stick_l_down))
-            controller_state.analog_stick_l.y = -32767;
+        else if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_stick_l_down))
+            gamepads[0].controller_state.analog_stick_l.y = -32767;
 
-        if (isKeyPressed(keyboard, config.kb_stick_l_left))
-            controller_state.analog_stick_l.x = -32767;
+        if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_stick_l_left))
+            gamepads[0].controller_state.analog_stick_l.x = -32767;
 
-        else if (isKeyPressed(keyboard, config.kb_stick_l_right))
-            controller_state.analog_stick_l.x = 32767;
+        else if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_stick_l_right))
+            gamepads[0].controller_state.analog_stick_l.x = 32767;
 
-        if (isKeyPressed(keyboard, config.kb_stick_l_press, mouse, config.mouse_stick_l_press))
-            controller_state.buttons |= HidNpadButton_StickL;
+        if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_stick_l_press, gamepads[0].mouse, gamepads[0].current_map.mouse_stick_l_press))
+            gamepads[0].controller_state.buttons |= HidNpadButton_StickL;
 
         // R stick
-        if (isKeyPressed(keyboard, config.kb_stick_r_up))
-            controller_state.analog_stick_r.y = 32767;
+        if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_stick_r_up))
+            gamepads[0].controller_state.analog_stick_r.y = 32767;
 
-        else if (isKeyPressed(keyboard, config.kb_stick_r_down))
-            controller_state.analog_stick_r.y = -32767;
+        else if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_stick_r_down))
+            gamepads[0].controller_state.analog_stick_r.y = -32767;
 
-        if (isKeyPressed(keyboard, config.kb_stick_r_left))
-            controller_state.analog_stick_r.x = -32767;
+        if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_stick_r_left))
+            gamepads[0].controller_state.analog_stick_r.x = -32767;
 
-        else if (isKeyPressed(keyboard, config.kb_stick_r_right))
-            controller_state.analog_stick_r.x = 32767;
+        else if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_stick_r_right))
+            gamepads[0].controller_state.analog_stick_r.x = 32767;
 
-        if (isKeyPressed(keyboard, config.kb_stick_r_press, mouse, config.mouse_stick_r_press))
-            controller_state.buttons |= HidNpadButton_StickR;
+        if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_stick_r_press, gamepads[0].mouse, gamepads[0].current_map.mouse_stick_r_press))
+            gamepads[0].controller_state.buttons |= HidNpadButton_StickR;
 
         // Mouse
 
         // Sticks
-        if (config.mouse_controls_rStick)
+        if (gamepads[0].current_map.mouse_controls_rStick)
         {
-            if (isKeyPressed(keyboard, config.kb_stick_r_left) || isKeyPressed(keyboard, config.kb_stick_r_right)) {}
-            else if (mouse.delta_x * (1280 * config.mouse_sensitivity) <= 32767 && mouse.delta_x * (1280 * config.mouse_sensitivity) >= -32767)
-                controller_state.analog_stick_r.x = mouse.delta_x * (1280 * config.mouse_sensitivity);
+            if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_stick_r_left) || isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_stick_r_right)) {}
+            else if (gamepads[0].mouse.delta_x * (1280 * gamepads[0].current_map.mouse_sensitivity) <= 32767 && gamepads[0].mouse.delta_x * (1280 * gamepads[0].current_map.mouse_sensitivity) >= -32767)
+                gamepads[0].controller_state.analog_stick_r.x = gamepads[0].mouse.delta_x * (1280 * gamepads[0].current_map.mouse_sensitivity);
             else
             {
-                if (mouse.delta_x > 0)
-                    controller_state.analog_stick_r.x = 32767;
-                if (mouse.delta_x < 0)
-                    controller_state.analog_stick_r.x = -32767;
+                if (gamepads[0].mouse.delta_x > 0)
+                    gamepads[0].controller_state.analog_stick_r.x = 32767;
+                if (gamepads[0].mouse.delta_x < 0)
+                    gamepads[0].controller_state.analog_stick_r.x = -32767;
             }
-            if (isKeyPressed(keyboard, config.kb_stick_r_up) || isKeyPressed(keyboard, config.kb_stick_r_down)) {}
-            else if (mouse.delta_y * (1280 * config.mouse_sensitivity) <= 32767 && mouse.delta_y * (1280 * config.mouse_sensitivity) >= -32767)
-                controller_state.analog_stick_r.y = mouse.delta_y * (-1280 * config.mouse_sensitivity);
+            if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_stick_r_up) || isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_stick_r_down)) {}
+            else if (gamepads[0].mouse.delta_y * (1280 * gamepads[0].current_map.mouse_sensitivity) <= 32767 && gamepads[0].mouse.delta_y * (1280 * gamepads[0].current_map.mouse_sensitivity) >= -32767)
+                gamepads[0].controller_state.analog_stick_r.y = gamepads[0].mouse.delta_y * (-1280 * gamepads[0].current_map.mouse_sensitivity);
             else
             {
-                if (mouse.delta_y > 0)
-                    controller_state.analog_stick_r.y = -32767;
-                if (mouse.delta_y < 0)
-                    controller_state.analog_stick_r.y = 32767;
+                if (gamepads[0].mouse.delta_y > 0)
+                    gamepads[0].controller_state.analog_stick_r.y = -32767;
+                if (gamepads[0].mouse.delta_y < 0)
+                    gamepads[0].controller_state.analog_stick_r.y = 32767;
             }
         }
 
-        if (config.mouse_controls_lStick)
+        if (gamepads[0].current_map.mouse_controls_lStick)
         {
-            if (isKeyPressed(keyboard, config.kb_stick_l_left) || isKeyPressed(keyboard, config.kb_stick_l_right)) {}
-            else if (mouse.delta_x * (1280 * config.mouse_sensitivity) <= 32767 && mouse.delta_x * (1280 * config.mouse_sensitivity) >= -32767)
-                controller_state.analog_stick_l.x = mouse.delta_x * (1280 * config.mouse_sensitivity);
+            if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_stick_l_left) || isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_stick_l_right)) {}
+            else if (gamepads[0].mouse.delta_x * (1280 * gamepads[0].current_map.mouse_sensitivity) <= 32767 && gamepads[0].mouse.delta_x * (1280 * gamepads[0].current_map.mouse_sensitivity) >= -32767)
+                gamepads[0].controller_state.analog_stick_l.x = gamepads[0].mouse.delta_x * (1280 * gamepads[0].current_map.mouse_sensitivity);
             else
             {
-                if (mouse.delta_x > 0)
-                    controller_state.analog_stick_l.x = 32767;
-                if (mouse.delta_x < 0)
-                    controller_state.analog_stick_l.x = -32767;
+                if (gamepads[0].mouse.delta_x > 0)
+                    gamepads[0].controller_state.analog_stick_l.x = 32767;
+                if (gamepads[0].mouse.delta_x < 0)
+                    gamepads[0].controller_state.analog_stick_l.x = -32767;
             }
-            if (isKeyPressed(keyboard, config.kb_stick_l_up) || isKeyPressed(keyboard, config.kb_stick_l_down)) {}
-            else if (mouse.delta_y * (1280 * config.mouse_sensitivity) <= 32767 && mouse.delta_y * (1280 * config.mouse_sensitivity) >= -32767)
-                controller_state.analog_stick_l.y = mouse.delta_y * (-1280 * config.mouse_sensitivity);
+            if (isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_stick_l_up) || isKeyPressed(gamepads[0].keyboard, gamepads[0].current_map.kb_stick_l_down)) {}
+            else if (gamepads[0].mouse.delta_y * (1280 * gamepads[0].current_map.mouse_sensitivity) <= 32767 && gamepads[0].mouse.delta_y * (1280 * gamepads[0].current_map.mouse_sensitivity) >= -32767)
+                gamepads[0].controller_state.analog_stick_l.y = gamepads[0].mouse.delta_y * (-1280 * gamepads[0].current_map.mouse_sensitivity);
             else
             {
-                if (mouse.delta_y > 0)
-                    controller_state.analog_stick_l.y = -32767;
-                if (mouse.delta_y < 0)
-                    controller_state.analog_stick_l.y = 32767;
+                if (gamepads[0].mouse.delta_y > 0)
+                    gamepads[0].controller_state.analog_stick_l.y = -32767;
+                if (gamepads[0].mouse.delta_y < 0)
+                    gamepads[0].controller_state.analog_stick_l.y = 32767;
             }
         }
 
-        if (config.mouse_controls_gyro)
+        if (gamepads[0].current_map.mouse_controls_gyro)
         {
-            controller_state.attribute |= HiddbgHdlsAttribute_HasVirtualSixAxisSensorAngle;
+            gamepads[0].controller_state.attribute |= HiddbgHdlsAttribute_HasVirtualSixAxisSensorAngle;
 
-            controller_state.six_axis_sensor_acceleration = {0.0f, 0.0f, 0.0f};
+            gamepads[0].controller_state.six_axis_sensor_acceleration = {0.0f, 0.0f, 0.0f};
 
             constexpr float angle_per_mouse_count = 0.001f;
 
-            controller_state.six_axis_sensor_angle.z += mouse.delta_x * angle_per_mouse_count;
-            controller_state.six_axis_sensor_angle.y -= mouse.delta_y * angle_per_mouse_count;
+            gamepads[0].controller_state.six_axis_sensor_angle.z += gamepads[0].mouse.delta_x * angle_per_mouse_count;
+            gamepads[0].controller_state.six_axis_sensor_angle.y -= gamepads[0].mouse.delta_y * angle_per_mouse_count;
         }
 
-        hiddbgSetHdlsState(hdls_handle, &controller_state);
+        old_program_id = program_id;
+        hiddbgSetHdlsState(gamepads[0].hdls_handle, &gamepads[0].controller_state);
         svcSleepThread(1000000ULL);
     }
 
