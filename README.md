@@ -10,11 +10,15 @@
 
 * Play any Switch game with a USB keyboard and mouse
 * Map any KB&M key/button to gamepad buttons or sticks using the key2con Homebrew
+* Mapping profiles per game
 * Experimental gyro/R-stick-as-mouse/L-stick-as-mouse support
+
+> **Note**: Currently, the gyroscope doesn't really work. I still need to study how it works.
+> The ***key2con sysmodule*** has a ***1ms update loop***.
 
 # 📝 Planned Features
 
-* [ ] Mapping profiles per game
+* [x] ~~Mapping profiles per game~~
 * [ ] Link a keyboard or mouse to an independent virtual gamepad (e.g. Keyboard 2 = Virtual Pro Controller 2)
 * [ ] An overlay cursor that can be moved on the Switch screen and used to simulate touchscreen input
 * [ ] Bluetooth KB&M support (It probably won't happen.)
@@ -30,20 +34,33 @@
 
 Install the latest version of the project and extract it to the root of your SD card, overwriting files if prompted.
 
-Now reboot or turn on your Nintendo Switch and enjoy!
-(ensure the sysmodule is set to auto-start.)
+Reboot your Nintendo Switch, or turn it on if it's powered off. Make sure the sysmodule is set to Auto Start.
 
 # ⚙️ Configuration
 
-To configure things like mapping and mouse sensitivity, use the **key2con Homebrew**.
+## How the Configuration Works
 
-But if you prefer to do it manually (you're a bit weird), the configuration file is located at `config/key2con/config.txt`.
+Currently, key2con supports one virtual gamepad, which can be assigned a profile file.
 
-(This file already comes with an initial configuration.)
+Each profile contains a `[global]` section that defines the default button mappings and mouse settings. Additional sections can be created for individual games using their Title IDs.
+
+When a game is running, key2con checks whether the selected profile contains a section matching the game's Title ID. If a matching section exists, its settings are used. Otherwise, Key2con falls back to the `[global]` section.
+
+## How do I configure it?
+
+To configure button mappings, profiles, mouse sensitivity, and other settings, use the **key2con Manager**!
+
+But if you prefer to edit the configuration manually (you're a bit weird), you can find the following files and directories on your SD card:
+
+* Profile directory: `config/key2con/profiles/`
+* Virtual gamepad configuration: `config/key2con/gamepads.txt`
+
+The profiles directory already contains a default profile with a `[global]` section.
 
 Template:
 
 ```text
+[global]
 dpad_up =
 dpad_down =
 dpad_left =
@@ -76,19 +93,24 @@ mouse_controls_lStick =
 mouse_sensitivity =
 ```
 
-⌨️ To map keyboard keys to gamepad actions, use the letter `K` followed by the corresponding value.
+To create a game-specific configuration, add a new section named after the game's Title ID.
 
-🖱️ To map mouse inputs, use the letter `M` followed by the corresponding value.
+⌨️ To map keyboard keys to gamepad actions, use the letter `K` followed by the corresponding key code.
+
+🖱️ To map mouse inputs, use the letter `M` followed by the corresponding button code.
 
 To map multiple keys and buttons, simply list them using a comma (`,`) without spaces.
+
+To toggle some mouse configs, just use `0` or `1`.
 
 Example:
 
 ```text
 button_ZR = K32,M2
+mouse_controls_rStick = 0
 ```
 
-The values can be found in the [libnx HID documentation](https://switchbrew.github.io/libnx/hid_8h_source.html).
+The corresponding input codes can be found in the [libnx HID documentation](https://switchbrew.github.io/libnx/hid_8h_source.html).
 
 # 👨‍💻 For Developers
 
@@ -102,9 +124,10 @@ Requirements for development:
 
 ## 🗂️ Project Structure
 
-* `/key2con/` - Contains all Homebrew configuration files
-* `/key2con_sysmodule/` - Contains all sysmodule files
-* `/key2con_sysmodule/41000000000E2C00/` - Contains the complete sysmodule build output, which can be copied to `/atmosphere/contents/`.
+* `/key2con_manager/` - Contains the key2con Manager source files
+* `/key2con_sysmodule/` - Contains the sysmodule source files
+* `/release/switch/key2con/` - Contains the Homebrew manager build output.
+* `/release/atmosphere/contents/41000000000E2C00/` - Contains the sysmodule build output and files.
 
 ## 🏠 Build
 
@@ -114,18 +137,24 @@ Clone the repository:
 git clone https://github.com/EnzoBernardinoMartins/key2con.git
 ```
 
-Open MSYS2 in the Homebrew configuration folder and run:
+Open MSYS2 in `/key2con_manager/` and run:
 
 ```
 make
 ```
 
-If the build is successful, a file called `key2con.nro` will be created in the folder.
+If the build is successful, a file called `key2con_manager.nro` will be created in the folder. Place it in the Homebrew build output folder, overwriting files if prompted.
 
 Repeat the process in the sysmodule folder. If the build is successful, a file called `key2con_sysmodule.nsp` will be created.
 
-Rename it to `exefs.nsp` and place it in the sysmodule build output folder, overwriting files if prompted.
+Rename it to `exefs.nsp` and place it in the sysmodule build output folder, always overwriting files if prompted.
 
-Copy the sysmodule build output to `/atmosphere/contents/` and copy the `key2con.nro` file to `/switch/key2con/`, overwriting files if prompted.
+Copy the sysmodule build output to `release/atmosphere/contents/` and copy the `key2con_manager.nro` file to `/release/switch/key2con/`.
 
-Now reboot or turn on your console (ensure the sysmodule is set to auto-start.)
+Now copy everything inside `release/` to the root of your SD card!
+
+Reboot your Nintendo Switch, or turn it on if it's powered off. Make sure the sysmodule is set to Auto Start.
+
+# 📜 License
+
+This project is licensed under the [MIT License](LICENSE).
