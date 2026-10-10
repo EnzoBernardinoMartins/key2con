@@ -66,3 +66,9 @@ struct Config
     bool mouse_controls_rStick = false;
     bool mouse_controls_lStick = false;
 };
+
+struct ProfileSection
+{
+    std::string name;
+    Config config;
+};
