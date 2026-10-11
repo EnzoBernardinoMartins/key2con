@@ -13,7 +13,7 @@
 * Mapping profiles per game
 * Experimental gyro/R-stick-as-mouse/L-stick-as-mouse support
 
-> **Note**: Currently, the gyroscope doesn't really work. I still need to study how it works.
+> **Note**: Currently, the **gyroscope doesn't really work**. **I** still **need** to **study how it works**.
 > The ***key2con sysmodule*** has a ***1ms update loop***.
 
 # 📝 Planned Features
