@@ -13,7 +13,6 @@
 * Mapping profiles per game
 * Experimental gyro/R-stick-as-mouse/L-stick-as-mouse support
 
-> **Note**: Currently, the **gyroscope doesn't really work**. **I** still **need** to **study how it works**.
 > The ***key2con sysmodule*** has a ***1ms update loop***.
 
 # 📝 Planned Features
@@ -90,6 +89,9 @@ stick_r_right =
 mouse_controls_gyro =
 mouse_controls_rStick =
 mouse_controls_lStick =
+controls_gyro_button =
+controls_rStick_button =
+controls_lStick_button =
 mouse_sensitivity =
 ```
 
@@ -101,13 +103,22 @@ To create a game-specific configuration, add a new section named after the game'
 
 To map multiple keys and buttons, simply list them using a comma (`,`) without spaces.
 
-To toggle some mouse configs, just use `0` or `1`.
+To set some mouse configs, use: `0`, `1`, `2` or `3`.
+
+* `0` - OFF
+* `1` - Always
+* `2` - While button is held
+* `3` - While button is not held
 
 Example:
 
 ```text
 button_ZR = K32,M2
-mouse_controls_rStick = 0
+controls_rStick_button = M2
+controls_gyro_button = M2
+mouse_controls_lStick = 0
+mouse_controls_rStick = 3
+mouse_controls_gyro = 2
 ```
 
 The corresponding input codes can be found in the [libnx HID documentation](https://switchbrew.github.io/libnx/hid_8h_source.html).
