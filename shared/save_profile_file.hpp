@@ -23,7 +23,7 @@ void load_profile_file(std::string file_location, std::vector<ProfileSection>& p
     std::string value = "";
     std::string line_string = "";
     size_t separator;
-    bool check_list[31] = {};
+    bool check_list[34] = {};
 
     ProfileSection current_section;
 
@@ -181,6 +181,21 @@ void load_profile_file(std::string file_location, std::vector<ProfileSection>& p
         if (key == "mouse_controls_lStick"){
             current_section.config.mouse_controls_lStick = std::stoi(value);
             check_list[30] = true;}
+
+        if (key == "controls_gyro_button"){
+            current_section.config.kb_controls_gyro_button = get_keyboard_vector(value, ',');
+            current_section.config.mouse_controls_gyro_button = get_mouse_vector(value, ',');
+            check_list[31] = true;}
+
+        if (key == "controls_rStick_button"){
+            current_section.config.kb_controls_rStick_button = get_keyboard_vector(value, ',');
+            current_section.config.mouse_controls_rStick_button = get_mouse_vector(value, ',');
+            check_list[32] = true;}
+
+        if (key == "controls_lStick_button"){
+            current_section.config.kb_controls_lStick_button = get_keyboard_vector(value, ',');
+            current_section.config.mouse_controls_lStick_button = get_mouse_vector(value, ',');
+            check_list[33] = true;}
 
         if (std::all_of(std::begin(check_list), std::end(check_list), [](bool valor) {return valor;} ))
         {

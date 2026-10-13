@@ -38,6 +38,10 @@ struct Config
     std::vector<HidKeyboardKey> kb_stick_r_left;
     std::vector<HidKeyboardKey> kb_stick_r_right;
 
+    std::vector<HidKeyboardKey> kb_controls_gyro_button;
+    std::vector<HidKeyboardKey> kb_controls_rStick_button;
+    std::vector<HidKeyboardKey> kb_controls_lStick_button;
+
     std::vector<HidMouseButton> mouse_dpad_up;
     std::vector<HidMouseButton> mouse_dpad_down;
     std::vector<HidMouseButton> mouse_dpad_left;
@@ -61,10 +65,14 @@ struct Config
     std::vector<HidMouseButton> mouse_stick_l_press;
     std::vector<HidMouseButton> mouse_stick_r_press;
 
+    std::vector<HidMouseButton> mouse_controls_gyro_button;
+    std::vector<HidMouseButton> mouse_controls_rStick_button;
+    std::vector<HidMouseButton> mouse_controls_lStick_button;
+
     float mouse_sensitivity = 1.0f;
-    bool mouse_controls_gyro = false;
-    bool mouse_controls_rStick = false;
-    bool mouse_controls_lStick = false;
+    int mouse_controls_gyro = 0;
+    int mouse_controls_rStick = 0;
+    int mouse_controls_lStick = 0;
 };
 
 struct ProfileSection

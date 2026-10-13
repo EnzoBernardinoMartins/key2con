@@ -244,6 +244,18 @@ void load_config_file(FILE* log, Config& config, std::string file_location, std:
 
             if (key == "mouse_controls_lStick")
                 config.mouse_controls_lStick = std::stoi(value);
+
+            if (key == "controls_gyro_button"){
+                config.kb_controls_gyro_button = get_keyboard_vector(value, ',');
+                config.mouse_controls_gyro_button = get_mouse_vector(value, ',');}
+
+            if (key == "controls_rStick_button"){
+                config.kb_controls_rStick_button = get_keyboard_vector(value, ',');
+                config.mouse_controls_rStick_button = get_mouse_vector(value, ',');}
+
+            if (key == "controls_lStick_button"){
+                config.kb_controls_lStick_button = get_keyboard_vector(value, ',');
+                config.mouse_controls_lStick_button = get_mouse_vector(value, ',');}
         }
     }
     fclose(config_file);
@@ -287,6 +299,10 @@ void rewrite_config_file(std::string file_location, std::vector<ProfileSection> 
         fprintf(config_file, "mouse_controls_rStick = 1\n");
         fprintf(config_file, "mouse_controls_lStick = 0\n");
         fprintf(config_file, "mouse_sensitivity = 1.0\n");
+
+        fprintf(config_file, "controls_gyro_button = \n");
+        fprintf(config_file, "controls_rStick_button = \n");
+        fprintf(config_file, "controls_lStick_button = \n");
     }
 
     else
@@ -325,6 +341,10 @@ void rewrite_config_file(std::string file_location, std::vector<ProfileSection> 
             fprintf(config_file, "mouse_controls_rStick = %s\n", std::to_string(PFS.config.mouse_controls_rStick).c_str());
             fprintf(config_file, "mouse_controls_lStick = %s\n", std::to_string(PFS.config.mouse_controls_lStick).c_str());
             fprintf(config_file, "mouse_sensitivity = %s\n", std::to_string(PFS.config.mouse_sensitivity).c_str());
+
+            fprintf(config_file, "controls_gyro_button = %s\n", keyboard_mouse_vectors_to_string(PFS.config.kb_controls_gyro_button, PFS.config.mouse_controls_gyro_button).c_str());
+            fprintf(config_file, "controls_rStick_button = %s\n", keyboard_mouse_vectors_to_string(PFS.config.kb_controls_rStick_button, PFS.config.mouse_controls_rStick_button).c_str());
+            fprintf(config_file, "controls_lStick_button = %s\n", keyboard_mouse_vectors_to_string(PFS.config.kb_controls_lStick_button, PFS.config.mouse_controls_lStick_button).c_str());
         }
     }
 

@@ -37,7 +37,6 @@ int main(void)
     NcmProgramLocation sys_module_location = {.program_id = KEY2CON_PROGRAM_ID, .storageID = NcmStorageId_None};
     u64 pid = 0;
 
-    bool input = true;
     bool waiting_for_input = false;
     bool Selected = false;
     bool wasSelected = false;
@@ -49,6 +48,8 @@ int main(void)
     bool wentUp = false;
     bool goDown = false;
     bool wentDown = false;
+
+    bool input = true;
     bool lock = true;
 
     bool Sysmodule = false;
@@ -384,8 +385,8 @@ int main(void)
             }
 
             if (gui_selection < 0)
-                gui_selection = 25;
-            if (gui_selection > 25)
+                gui_selection = 28;
+            if (gui_selection > 28)
                 gui_selection = 0;
 
             HidKeyboardState temp_keyboard_state = keyboard;
@@ -490,6 +491,9 @@ int main(void)
             if (gui_selection == 23) {map_config_kb_struct(current_config.kb_stick_r_down, key_received, button_received, Selected, Deleted, got_keyboard);}
             if (gui_selection == 24) {map_config_kb_struct(current_config.kb_stick_r_left, key_received, button_received, Selected, Deleted, got_keyboard);}
             if (gui_selection == 25) {map_config_kb_struct(current_config.kb_stick_r_right, key_received, button_received, Selected, Deleted, got_keyboard);}
+            if (gui_selection == 26) {map_config_kbm_struct(current_config.kb_controls_gyro_button, current_config.mouse_controls_gyro_button, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
+            if (gui_selection == 27) {map_config_kbm_struct(current_config.kb_controls_lStick_button, current_config.mouse_controls_lStick_button, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
+            if (gui_selection == 28) {map_config_kbm_struct(current_config.kb_controls_rStick_button, current_config.mouse_controls_rStick_button, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
 
             while (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_Escape))
             {
@@ -531,11 +535,15 @@ int main(void)
                 "rStick Up: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_r_up),
                 "rStick Down: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_r_down),
                 "rStick Left: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_r_left),
-                "rStick Right: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_r_right)};
+                "rStick Right: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_r_right),
+            
+                "Controls gyro Button: " + keyboard_mouse_vectors_to_string(current_config.kb_controls_gyro_button, current_config.mouse_controls_gyro_button),
+                "Controls lStick Button: " + keyboard_mouse_vectors_to_string(current_config.kb_controls_lStick_button, current_config.mouse_controls_lStick_button),
+                "Controls rStick Button: " + keyboard_mouse_vectors_to_string(current_config.kb_controls_rStick_button, current_config.mouse_controls_rStick_button)};
             control_mapping.instructions = "Enter=map|Esc=return|Del=remove last map";
 
             show_UiMenu(control_mapping, gui_selection);
-        }
+    }
 
         if (gui_section == 4)
         {
@@ -559,35 +567,41 @@ int main(void)
             if (gui_selection == 0)
             {
                 if (Selected)
-                {
-                    if (current_config.mouse_controls_rStick)
-                        current_config.mouse_controls_rStick = false;
-                    else
-                        current_config.mouse_controls_rStick = true;
-                }
+                    current_config.mouse_controls_lStick++;
+                if (Deleted)
+                    current_config.mouse_controls_lStick--;
+                
+                if (current_config.mouse_controls_lStick < 0)
+                    current_config.mouse_controls_lStick = 3;
+                if (current_config.mouse_controls_lStick > 3)
+                    current_config.mouse_controls_lStick = 0;
             }
 
 
             if (gui_selection == 1)
             {
                 if (Selected)
-                {
-                    if (current_config.mouse_controls_lStick)
-                        current_config.mouse_controls_lStick = false;
-                    else
-                        current_config.mouse_controls_lStick = true;
-                }
+                    current_config.mouse_controls_rStick++;
+                if (Deleted)
+                    current_config.mouse_controls_rStick--;
+                
+                if (current_config.mouse_controls_rStick < 0)
+                    current_config.mouse_controls_rStick = 3;
+                if (current_config.mouse_controls_rStick > 3)
+                    current_config.mouse_controls_rStick = 0;
             }
 
             if (gui_selection == 2)
             {
                 if (Selected)
-                {
-                    if (current_config.mouse_controls_gyro)
-                        current_config.mouse_controls_gyro = false;
-                    else
-                        current_config.mouse_controls_gyro = true;
-                }
+                    current_config.mouse_controls_gyro++;
+                if (Deleted)
+                    current_config.mouse_controls_gyro--;
+                
+                if (current_config.mouse_controls_gyro < 0)
+                    current_config.mouse_controls_gyro = 3;
+                if (current_config.mouse_controls_gyro > 3)
+                    current_config.mouse_controls_gyro = 0;
             }
 
             if (gui_selection == 3)
@@ -601,11 +615,12 @@ int main(void)
             // Front-End
             UiMenu configuration;
             configuration.title = "Configuration";
+            char* mouse_control_modes[] = {"OFF", "Always", "While button is held", "While button is not held"};
 
             configuration.options = {
-                "Mouse as R-Stick: " + std::string(current_config.mouse_controls_rStick ? "ON" : "OFF"),
-                "Mouse as L-Stick: " + std::string(current_config.mouse_controls_lStick ? "ON" : "OFF"),
-                "Mouse as Gyro: " + std::string(current_config.mouse_controls_gyro ? "ON" : "OFF"),
+                std::string("Mouse as L-Stick: ") + mouse_control_modes[current_config.mouse_controls_lStick],
+                std::string("Mouse as R-Stick: ") + mouse_control_modes[current_config.mouse_controls_rStick],
+                std::string("Mouse as Gyro: ") + mouse_control_modes[current_config.mouse_controls_gyro],
                 "Mouse Sensitivity: " + std::to_string(current_config.mouse_sensitivity)};
             configuration.instructions = "Enter=toggle/increase|Esc=return|Del=decrease";
 
