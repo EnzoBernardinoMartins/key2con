@@ -1,0 +1,6 @@
+[submodule "overlay/libs/overlay/libs/libtesla"]
+	path = overlay/libs/overlay/libs/libtesla
+	url = https://github.com/WerWolv/libtesla
+[submodule "overlay/libs/libtesla"]
+	path = overlay/libs/libtesla
+	url = https://github.com/WerWolv/libtesla
