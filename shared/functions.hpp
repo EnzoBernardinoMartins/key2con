@@ -7,6 +7,7 @@
 
 #include "config_struct.hpp"
 #include "virtual_controller_device.hpp"
+#include "gui.hpp"
 
 bool isKeyPressed(const HidKeyboardState& keyboard, const std::vector<HidKeyboardKey>& keys, const HidMouseState& mouse = {}, const std::vector<HidMouseButton>& buttons = {})
 {
@@ -112,6 +113,69 @@ std::string keyboard_mouse_vectors_to_string(const std::vector<HidKeyboardKey>& 
     if (!result.empty())
         result.erase(result.size() - 1);
     
+    return result;
+};
+
+struct GetInputResult
+{
+    HidKeyboardKey key_received;
+    HidMouseButton button_received;
+};
+
+GetInputResult GetKeyboardMouseInput(HidKeyboardState keyboard, HidMouseState mouse)
+{
+    GetInputResult result{};
+    result.key_received = static_cast<HidKeyboardKey>(0);
+    result.button_received = static_cast<HidMouseButton>(0);
+
+    HidKeyboardState temp_keyboard_state{};
+    HidMouseState temp_mouse_state{};
+
+    bool waiting_for_input = true;
+    while (keyboard.keys[0] != 0 || keyboard.keys[1] != 0 || keyboard.keys[2] != 0 || keyboard.keys[3] != 0 || mouse.buttons != 0)
+    {
+        hidGetKeyboardStates(&keyboard, 1);
+        hidGetMouseStates(&mouse, 1);
+    }
+
+    while (waiting_for_input)
+    {
+        hidGetKeyboardStates(&keyboard, 1);
+        hidGetMouseStates(&mouse, 1);
+
+        for (int i = 0; i < 4; i++)
+        {
+            u64 new_keys = keyboard.keys[i] & ~temp_keyboard_state.keys[i];
+
+            for (int bit = 0; bit < 64; bit++)
+            {
+                if (new_keys & (1ULL << bit))
+                {
+                    result.key_received = static_cast<HidKeyboardKey>(i * 64 + bit);
+
+                    waiting_for_input = false;
+                    return result;
+                }
+            }
+
+            if (!waiting_for_input)
+                break;
+        }
+
+        u64 new_buttons = mouse.buttons & ~temp_mouse_state.buttons;
+
+        for (int bit = 0; bit < 32; bit++)
+        {
+            if (new_buttons & (1ULL << bit))
+            {
+                result.button_received = static_cast<HidMouseButton>(1U << bit);
+
+                waiting_for_input = false;
+                return result;
+            }
+        }
+    }
+
     return result;
 };
 
@@ -351,20 +415,18 @@ void rewrite_config_file(std::string file_location, std::vector<ProfileSection> 
     fclose(config_file);
 };
 
-void map_config_kbm_struct(std::vector<HidKeyboardKey>& keys,
-    std::vector<HidMouseButton>& buttons,
-    HidKeyboardKey key_received, HidMouseButton button_received,
-    bool Selected, bool Deleted, bool got_keyboard, bool got_mouse)
+void map_config_kbm_struct(std::vector<HidKeyboardKey>& keys, std::vector<HidMouseButton>& buttons,
+    HidKeyboardKey key_received, HidMouseButton button_received, ManagerActions& map_actions)
 {
-    if (Selected)
+    if (map_actions.Selected)
     {
-        if (got_keyboard)
+        if (key_received != static_cast<HidKeyboardKey>(0))
             keys.push_back(key_received);
-        if (got_mouse)
+        if (button_received != static_cast<HidMouseButton>(0))
             buttons.push_back(button_received);
     }
 
-    if (Deleted)
+    if (map_actions.Deleted)
     {
         if (!buttons.empty())
             buttons.pop_back();
@@ -375,16 +437,15 @@ void map_config_kbm_struct(std::vector<HidKeyboardKey>& keys,
 }
 
 void map_config_kb_struct(std::vector<HidKeyboardKey>& keys,
-    HidKeyboardKey key_received, HidMouseButton button_received,
-    bool Selected, bool Deleted, bool got_keyboard)
+    HidKeyboardKey key_received, HidMouseButton button_received, ManagerActions& map_actions)
 {
-    if (Selected)
+    if (map_actions.Selected)
     {
-        if (got_keyboard)
+        if (key_received != static_cast<HidKeyboardKey>(0))
             keys.push_back(key_received);
     }
 
-    if (Deleted)
+    if (map_actions.Deleted)
     {
         if (!keys.empty())
             keys.pop_back();

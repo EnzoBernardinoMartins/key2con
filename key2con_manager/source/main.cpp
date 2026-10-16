@@ -34,27 +34,11 @@ int main(void)
     HidMouseState mouse;
     VirtualDevice_K2C gamepads[4];
 
-    NcmProgramLocation sys_module_location = {.program_id = KEY2CON_PROGRAM_ID, .storageID = NcmStorageId_None};
     u64 pid = 0;
-
-    bool waiting_for_input = false;
-    bool Selected = false;
-    bool wasSelected = false;
-    bool Returned = false;
-    bool wasReturned = false;
-    bool Deleted = false;
-    bool wasDeleted = false;
-    bool goUp = false;
-    bool wentUp = false;
-    bool goDown = false;
-    bool wentDown = false;
-
-    bool input = true;
-    bool lock = true;
 
     bool Sysmodule = false;
     bool AutoStart = false;
-
+    ManagerActions actions;
     int gui_section = 0; /*
     0 = Main
     1 = Game Selector
@@ -101,109 +85,17 @@ int main(void)
         else
             Sysmodule = false;
 
-        // Actions
-        if (input)
-        {
-            // Go Up
-            if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_UpArrow) && wentUp == false)
-            {
-                goUp = true;
-                wentUp = true;
-            }
-            else if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_UpArrow) && wentUp)
-            {
-                goUp = false;
-                wentUp = true;
-            }
-            else
-            {
-                goUp = false;
-                wentUp = false;
-            }
+        // Updates actions such as selecting an option from the menu
+        UpdateManagerActions(actions);
 
-            // Go Down
-            if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_DownArrow) && wentDown == false)
-            {
-                goDown = true;
-                wentDown = true;
-            }
-            else if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_DownArrow) && wentDown)
-            {
-                goDown = false;
-                wentDown = true;
-            }
-            else
-            {
-                goDown = false;
-                wentDown = false;
-            }
-
-            // Selected
-            if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_Return) && wasSelected == false)
-            {
-                Selected = true;
-                wasSelected = true;
-            }
-            else if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_Return) && wasSelected)
-            {
-                Selected = false;
-                wasSelected = true;
-            }
-            else
-            {
-                Selected = false;
-                wasSelected = false;
-            }
-
-            // Returned
-            if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_Escape) && wasReturned == false)
-            {
-                Returned = true;
-                wasReturned = true;
-            }
-            else if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_Escape) && wasReturned)
-            {
-                Returned = false;
-                wasReturned = true;
-            }
-            else
-            {
-                Returned = false;
-                wasReturned = false;
-            }
-
-            // Deleted
-            if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_Delete) && wasDeleted == false)
-            {
-                Deleted = true;
-                wasDeleted = true;
-            }
-            else if (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_Delete) && wasDeleted)
-            {
-                Deleted = false;
-                wasDeleted = true;
-            }
-            else
-            {
-                Deleted = false;
-                wasDeleted = false;
-            }
-
-            if (goUp)
-                gui_selection -= 1;
-            if (goDown)
-                gui_selection += 1;
-        }
-
-        if (waiting_for_input)
-            input = false;
-        else
-            input = true;
-
+        if (actions.goUp)
+            gui_selection -= 1;
+        if (actions.goDown)
+            gui_selection += 1;
 
         if (gui_section == 0)
         {
-            if (Returned)
+            if (actions.Returned)
             {
                 break;
             }
@@ -213,7 +105,7 @@ int main(void)
             if (gui_selection > 1)
                 gui_selection = 0;
 
-            if (Selected)
+            if (actions.Selected)
             {
                 if (gui_selection == 0)
                 {
@@ -232,7 +124,7 @@ int main(void)
 
                 if (gui_selection == 1)
                 {
-                    Selected = false;
+                    actions.Selected = false;
                     gui_selection = 0;
                     gui_section = 1;
                     
@@ -252,7 +144,7 @@ int main(void)
 
         if (gui_section == 1)
         {
-            if (Returned)
+            if (actions.Returned)
             {
                 gui_selection = 0;
                 gui_section = 0;
@@ -263,18 +155,18 @@ int main(void)
             if (gui_selection > static_cast<int>(last_played_games.size()))
                 gui_selection = 0;
 
-            if (Selected)
+            if (actions.Selected)
             {
                 if (gui_selection == 0)
                 {
-                    Selected = false;
+                    actions.Selected = false;
                     current_map_activity = "global";
                     gui_section = 2;
                 }
                 
                 else
                 {
-                    Selected = false;
+                    actions.Selected = false;
                     current_map_activity = last_played_games[gui_selection - 1].title_id;
                     gui_section = 2;
                 }
@@ -292,7 +184,7 @@ int main(void)
 
         if (gui_section == 2)
         {
-            if (Returned)
+            if (actions.Returned)
             {
                 gui_selection = 0;
                 gui_section = 1;
@@ -303,18 +195,18 @@ int main(void)
             if (gui_selection > 1)
                 gui_selection = 0;
 
-            if (Selected)
+            if (actions.Selected)
             {
                 if (gui_selection == 0)
                 {
-                    Selected = false;
+                    actions.Selected = false;
                     gui_selection = 0;
                     gui_section = 3;
                 }
 
                 if (gui_selection == 1)
                 {
-                    Selected = false;
+                    actions.Selected = false;
                     gui_selection = 0;
                     gui_section = 4;
                 }
@@ -372,7 +264,7 @@ int main(void)
 
         if (gui_section == 3)
         {
-            if (Returned)
+            if (actions.Returned)
             {
                 int section_position = get_section_position(profile_file_sections, current_map_activity);
 
@@ -389,111 +281,44 @@ int main(void)
             if (gui_selection > 28)
                 gui_selection = 0;
 
-            HidKeyboardState temp_keyboard_state = keyboard;
-            HidMouseState temp_mouse_state = mouse;
-
-            temp_keyboard_state.keys[0] = 0;
-            temp_keyboard_state.keys[1] = 0;
-            temp_keyboard_state.keys[2] = 0;
-            temp_keyboard_state.keys[3] = 0;
-            temp_mouse_state.buttons = 0;
-
-            HidKeyboardKey key_received = static_cast<HidKeyboardKey>(0);
-            HidMouseButton button_received = static_cast<HidMouseButton>(0);
-
-            bool got_keyboard = false;
-            bool got_mouse = false;
-
-            if (Selected)
+            GetInputResult gir;
+            if (actions.Selected)
             {
-                lock = true;
-                waiting_for_input = true;
-
-                while (waiting_for_input)
-                {
-                    hidGetKeyboardStates(&keyboard, 1);
-                    hidGetMouseStates(&mouse, 1);
-
-                    if (lock)
-                    {
-                        while (keyboard.keys[0] != 0 || keyboard.keys[1] != 0 || keyboard.keys[2] != 0 || keyboard.keys[3] != 0 || mouse.buttons != 0)
-                        {
-                            hidGetKeyboardStates(&keyboard, 1);
-                            hidGetMouseStates(&mouse, 1);
-                        }
-                        lock = false;
-                    }
-
-
-                    for (int i = 0; i < 4; i++)
-                    {
-                        u64 new_keys = keyboard.keys[i] & ~temp_keyboard_state.keys[i];
-
-                        for (int bit = 0; bit < 64; bit++)
-                        {
-                            if (new_keys & (1ULL << bit))
-                            {
-                                key_received = static_cast<HidKeyboardKey>(i * 64 + bit);
-
-                                waiting_for_input = false;
-                                got_keyboard = true;
-                                break;
-                            }
-                        }
-
-                        if (!waiting_for_input)
-                            break;
-                    }
-
-                    u64 new_buttons = mouse.buttons & ~temp_mouse_state.buttons;
-
-                    for (int bit = 0; bit < 32; bit++)
-                    {
-                        if (new_buttons & (1ULL << bit))
-                        {
-                            button_received = static_cast<HidMouseButton>(1U << bit);
-
-                            waiting_for_input = false;
-                            got_mouse = true;
-                            break;
-                        }
-                    }
-
-                    consoleClear();
-                    printf("Waiting for input...");
-                    consoleUpdate(NULL);
-                }
+                consoleClear();
+                printf("Waiting for input...");
+                consoleUpdate(NULL);
+                gir = GetKeyboardMouseInput(keyboard, mouse);
             }
 
-            if (gui_selection == 0) {map_config_kbm_struct(current_config.kb_dpad_up, current_config.mouse_dpad_up, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
-            if (gui_selection == 1) {map_config_kbm_struct(current_config.kb_dpad_down, current_config.mouse_dpad_down, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
-            if (gui_selection == 2) {map_config_kbm_struct(current_config.kb_dpad_left, current_config.mouse_dpad_left, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
-            if (gui_selection == 3) {map_config_kbm_struct(current_config.kb_dpad_right, current_config.mouse_dpad_right, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
-            if (gui_selection == 4) {map_config_kbm_struct(current_config.kb_button_b, current_config.mouse_button_b, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}            
-            if (gui_selection == 5) {map_config_kbm_struct(current_config.kb_button_a, current_config.mouse_button_a, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}            
-            if (gui_selection == 6) {map_config_kbm_struct(current_config.kb_button_y, current_config.mouse_button_y, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}            
-            if (gui_selection == 7) {map_config_kbm_struct(current_config.kb_button_x, current_config.mouse_button_x, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}            
-            if (gui_selection == 8) {map_config_kbm_struct(current_config.kb_button_L, current_config.mouse_button_L, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}            
-            if (gui_selection == 9) {map_config_kbm_struct(current_config.kb_button_R, current_config.mouse_button_R, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
-            if (gui_selection == 10) {map_config_kbm_struct(current_config.kb_button_ZL, current_config.mouse_button_ZL, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
-            if (gui_selection == 11) {map_config_kbm_struct(current_config.kb_button_ZR, current_config.mouse_button_ZR, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
-            if (gui_selection == 12) {map_config_kbm_struct(current_config.kb_button_minus, current_config.mouse_button_minus, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
-            if (gui_selection == 13) {map_config_kbm_struct(current_config.kb_button_plus, current_config.mouse_button_plus, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
-            if (gui_selection == 14) {map_config_kbm_struct(current_config.kb_button_capture, current_config.mouse_button_capture, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
-            if (gui_selection == 15) {map_config_kbm_struct(current_config.kb_button_home, current_config.mouse_button_home, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
-            if (gui_selection == 16) {map_config_kbm_struct(current_config.kb_stick_l_press, current_config.mouse_stick_l_press, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
-            if (gui_selection == 17) {map_config_kb_struct(current_config.kb_stick_l_up, key_received, button_received, Selected, Deleted, got_keyboard);}
-            if (gui_selection == 18) {map_config_kb_struct(current_config.kb_stick_l_down, key_received, button_received, Selected, Deleted, got_keyboard);}
-            if (gui_selection == 19) {map_config_kb_struct(current_config.kb_stick_l_left, key_received, button_received, Selected, Deleted, got_keyboard);}
-            if (gui_selection == 20) {map_config_kb_struct(current_config.kb_stick_l_right, key_received, button_received, Selected, Deleted, got_keyboard);}
-            if (gui_selection == 21) {map_config_kbm_struct(current_config.kb_stick_r_press, current_config.mouse_stick_r_press, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
-            if (gui_selection == 22) {map_config_kb_struct(current_config.kb_stick_r_up, key_received, button_received, Selected, Deleted, got_keyboard);}
-            if (gui_selection == 23) {map_config_kb_struct(current_config.kb_stick_r_down, key_received, button_received, Selected, Deleted, got_keyboard);}
-            if (gui_selection == 24) {map_config_kb_struct(current_config.kb_stick_r_left, key_received, button_received, Selected, Deleted, got_keyboard);}
-            if (gui_selection == 25) {map_config_kb_struct(current_config.kb_stick_r_right, key_received, button_received, Selected, Deleted, got_keyboard);}
-            if (gui_selection == 26) {map_config_kbm_struct(current_config.kb_controls_gyro_button, current_config.mouse_controls_gyro_button, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
-            if (gui_selection == 27) {map_config_kbm_struct(current_config.kb_controls_lStick_button, current_config.mouse_controls_lStick_button, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
-            if (gui_selection == 28) {map_config_kbm_struct(current_config.kb_controls_rStick_button, current_config.mouse_controls_rStick_button, key_received, button_received, Selected, Deleted, got_keyboard, got_mouse);}
+            if (gui_selection == 0) {map_config_kbm_struct(current_config.kb_dpad_up, current_config.mouse_dpad_up, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 1) {map_config_kbm_struct(current_config.kb_dpad_down, current_config.mouse_dpad_down, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 2) {map_config_kbm_struct(current_config.kb_dpad_left, current_config.mouse_dpad_left, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 3) {map_config_kbm_struct(current_config.kb_dpad_right, current_config.mouse_dpad_right, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 4) {map_config_kbm_struct(current_config.kb_button_b, current_config.mouse_button_b, gir.key_received, gir.button_received, actions);}            
+            if (gui_selection == 5) {map_config_kbm_struct(current_config.kb_button_a, current_config.mouse_button_a, gir.key_received, gir.button_received, actions);}            
+            if (gui_selection == 6) {map_config_kbm_struct(current_config.kb_button_y, current_config.mouse_button_y, gir.key_received, gir.button_received, actions);}            
+            if (gui_selection == 7) {map_config_kbm_struct(current_config.kb_button_x, current_config.mouse_button_x, gir.key_received, gir.button_received, actions);}            
+            if (gui_selection == 8) {map_config_kbm_struct(current_config.kb_button_L, current_config.mouse_button_L, gir.key_received, gir.button_received, actions);}            
+            if (gui_selection == 9) {map_config_kbm_struct(current_config.kb_button_R, current_config.mouse_button_R, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 10) {map_config_kbm_struct(current_config.kb_button_ZL, current_config.mouse_button_ZL, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 11) {map_config_kbm_struct(current_config.kb_button_ZR, current_config.mouse_button_ZR, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 12) {map_config_kbm_struct(current_config.kb_button_minus, current_config.mouse_button_minus, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 13) {map_config_kbm_struct(current_config.kb_button_plus, current_config.mouse_button_plus, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 14) {map_config_kbm_struct(current_config.kb_button_capture, current_config.mouse_button_capture, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 15) {map_config_kbm_struct(current_config.kb_button_home, current_config.mouse_button_home, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 16) {map_config_kbm_struct(current_config.kb_stick_l_press, current_config.mouse_stick_l_press, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 17) {map_config_kb_struct(current_config.kb_stick_l_up, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 18) {map_config_kb_struct(current_config.kb_stick_l_down, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 19) {map_config_kb_struct(current_config.kb_stick_l_left, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 20) {map_config_kb_struct(current_config.kb_stick_l_right, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 21) {map_config_kbm_struct(current_config.kb_stick_r_press, current_config.mouse_stick_r_press, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 22) {map_config_kb_struct(current_config.kb_stick_r_up, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 23) {map_config_kb_struct(current_config.kb_stick_r_down, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 24) {map_config_kb_struct(current_config.kb_stick_r_left, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 25) {map_config_kb_struct(current_config.kb_stick_r_right, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 26) {map_config_kbm_struct(current_config.kb_controls_gyro_button, current_config.mouse_controls_gyro_button, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 27) {map_config_kbm_struct(current_config.kb_controls_lStick_button, current_config.mouse_controls_lStick_button, gir.key_received, gir.button_received, actions);}
+            if (gui_selection == 28) {map_config_kbm_struct(current_config.kb_controls_rStick_button, current_config.mouse_controls_rStick_button, gir.key_received, gir.button_received, actions);}
 
             while (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_Escape))
             {
@@ -547,7 +372,7 @@ int main(void)
 
         if (gui_section == 4)
         {
-            if (Returned)
+            if (actions.Returned)
             {
                 int section_position = get_section_position(profile_file_sections, current_map_activity);
 
@@ -566,9 +391,9 @@ int main(void)
 
             if (gui_selection == 0)
             {
-                if (Selected)
+                if (actions.Selected)
                     current_config.mouse_controls_lStick++;
-                if (Deleted)
+                if (actions.Deleted)
                     current_config.mouse_controls_lStick--;
                 
                 if (current_config.mouse_controls_lStick < 0)
@@ -580,9 +405,9 @@ int main(void)
 
             if (gui_selection == 1)
             {
-                if (Selected)
+                if (actions.Selected)
                     current_config.mouse_controls_rStick++;
-                if (Deleted)
+                if (actions.Deleted)
                     current_config.mouse_controls_rStick--;
                 
                 if (current_config.mouse_controls_rStick < 0)
@@ -593,9 +418,9 @@ int main(void)
 
             if (gui_selection == 2)
             {
-                if (Selected)
+                if (actions.Selected)
                     current_config.mouse_controls_gyro++;
-                if (Deleted)
+                if (actions.Deleted)
                     current_config.mouse_controls_gyro--;
                 
                 if (current_config.mouse_controls_gyro < 0)
@@ -606,16 +431,16 @@ int main(void)
 
             if (gui_selection == 3)
             {
-                if (Selected)
+                if (actions.Selected)
                     current_config.mouse_sensitivity += 0.10f;
-                if (Deleted)
+                if (actions.Deleted)
                     current_config.mouse_sensitivity -= 0.10f;
             }
 
             // Front-End
             UiMenu configuration;
             configuration.title = "Configuration";
-            char* mouse_control_modes[] = {"OFF", "Always", "While button is held", "While button is not held"};
+            std::string mouse_control_modes[] = {"OFF", "Always", "While button is held", "While button is not held"};
 
             configuration.options = {
                 std::string("Mouse as L-Stick: ") + mouse_control_modes[current_config.mouse_controls_lStick],
@@ -638,4 +463,4 @@ int main(void)
     hidExit();
     consoleExit(NULL);
     return 0;
-} 
+}

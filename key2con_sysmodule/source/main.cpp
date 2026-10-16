@@ -85,12 +85,7 @@ void __appExit(void)
 int main(int argc, char* argv[])
 {
     Result rc;
-    std::string current_activity = "";
-
     FILE* log = fopen("sdmc:/switch/key2con/key2con_sysmodule.log", "w");
-
-    if (log == NULL)
-        return 1;
 
     rc = hiddbgAttachHdlsWorkBuffer(&gamepads[0].hdls_session, gamepads[0].hdls_workmem, sizeof(gamepads[0].hdls_workmem));
     if (R_FAILED(rc))
@@ -100,15 +95,14 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    fprintf(log, "key2con initialized!");
-    fflush(log);
-
+    // Set the initial information for the virtual control
     gamepads[0].device_info.deviceType = HidDeviceType_FullKey3;
     gamepads[0].device_info.npadInterfaceType = HidNpadInterfaceType_Bluetooth;
     gamepads[0].device_info.colorLeftGrip = RGBA8_MAXALPHA(255, 255, 255);
     gamepads[0].device_info.colorRightGrip = RGBA8_MAXALPHA(0, 0, 0);
     gamepads[0].device_info.singleColorBody = RGBA8_MAXALPHA(175, 175, 175 );
     gamepads[0].device_info.singleColorButtons = RGBA8_MAXALPHA(255, 50, 50);
+    gamepads[0].controller_state.battery_level = 4;
 
     rc = hiddbgAttachHdlsVirtualDevice(&gamepads[0].hdls_handle, &gamepads[0].device_info);
     if (R_FAILED(rc))
@@ -123,27 +117,31 @@ int main(int argc, char* argv[])
         fflush(log);
     }
 
-    gamepads[0].controller_state.battery_level = 4;
-
-    gamepads[0].controller_state.analog_stick_l.x = 0;
-    gamepads[0].controller_state.analog_stick_l.y = 0;
-
-    gamepads[0].controller_state.analog_stick_r.x = 0;
-    gamepads[0].controller_state.analog_stick_r.y = 0;
-
     // Gamepads config file check
-
     FILE* gamepads_file = fopen("sdmc:/config/key2con/gamepads.txt", "r");
     if (gamepads_file == NULL)
     {
-        gamepads_file = fopen("sdmc:/config/key2con/gamepads.txt", "w");
-        rewrite_gamepads_file(gamepads_file, gamepads, true);
-        fclose(gamepads_file);
-        gamepads_file = fopen("sdmc:/config/key2con/gamepads.txt", "r");
+        gamepads_file = fopen(
+            "sdmc:/config/key2con/gamepads.txt", "w"
+        );
 
         if (gamepads_file == NULL)
         {
-            fprintf(log, "Error open/create gamepads file\n");
+            fprintf(log, "Error creating gamepads file\n");
+            fflush(log);
+            return 1;
+        }
+
+        rewrite_gamepads_file(gamepads_file, gamepads, true);
+        fclose(gamepads_file);
+
+        gamepads_file = fopen(
+            "sdmc:/config/key2con/gamepads.txt", "r"
+        );
+
+        if (gamepads_file == NULL)
+        {
+            fprintf(log, "Error reopening gamepads file\n");
             fflush(log);
             return 1;
         }
@@ -151,7 +149,9 @@ int main(int argc, char* argv[])
 
     load_gamepads_file(gamepads_file, gamepads);
     fclose(gamepads_file);
+    gamepads_file = NULL;
 
+    // Profile file check
     FILE* config_file = fopen(gamepads[0].profile_path.c_str(), "r");
     if (config_file == NULL)
     {
@@ -166,15 +166,15 @@ int main(int argc, char* argv[])
         }
     }
     fclose(config_file);
-
     load_config_file(log, gamepads[0].current_map, gamepads[0].profile_path, "global");
 
+    // Variables
     u64 pid = 0;
     u64 program_id = 0;
     u64 old_program_id = 0;
     char title_id_str[17];
+    std::string current_activity = "";
     u64 last_gyro_tick = armGetSystemTick();
-
     u64 last_mouse_sample = 0;
     {
         HidMouseState first[1];
@@ -182,45 +182,10 @@ int main(int argc, char* argv[])
             last_mouse_sample = first[0].sampling_number;
     }
 
+    fprintf(log, "key2con initialized!");
+    fflush(log);
     while (true)
     {
-        hidGetKeyboardStates(&gamepads[0].keyboard, 1);
-        s32 mouse_dx = 0, mouse_dy = 0;
-        {
-            HidMouseState samples[7];
-            size_t n = hidGetMouseStates(samples, 7);
-        
-            u64 newest = 0;
-            size_t newest_idx = 0;
-            for (size_t i = 0; i < n; i++)
-            {
-                if (samples[i].sampling_number > last_mouse_sample)
-                {
-                    mouse_dx += samples[i].delta_x;
-                    mouse_dy += samples[i].delta_y;
-                }
-                if (samples[i].sampling_number >= newest)
-                {
-                    newest = samples[i].sampling_number;
-                    newest_idx = i;
-                }
-            }
-        
-            if (n > 0)
-            {
-                gamepads[0].mouse = samples[newest_idx];
-                if (newest > last_mouse_sample)
-                    last_mouse_sample = newest;
-            }
-        }
-
-        gamepads[0].controller_state.buttons = 0;
-        gamepads[0].controller_state.analog_stick_l.x = 0;
-        gamepads[0].controller_state.analog_stick_l.y = 0;
-        gamepads[0].controller_state.analog_stick_r.x = 0;
-        gamepads[0].controller_state.analog_stick_r.y = 0;
-        gamepads[0].controller_state.attribute = 0;
-
         // Load the global or game map
         pid = 0;
         program_id = 0;
@@ -239,9 +204,51 @@ int main(int argc, char* argv[])
         if (old_program_id != program_id && pid != 0)
             load_config_file(log, gamepads[0].current_map, gamepads[0].profile_path, title_id_str);
 
+        // Updates keyboard values
+        hidGetKeyboardStates(&gamepads[0].keyboard, 1);
+
+        // Accumulates mouse deltas for the gyro and returns the values ​​from the latest sample to the rest of the code.
+        s32 accumulated_mouse_dx = 0, accumulated_mouse_dy = 0;
+        {
+            HidMouseState samples[7];
+            size_t n = hidGetMouseStates(samples, 7);
+        
+            u64 newest = 0;
+            size_t newest_idx = 0;
+            for (size_t i = 0; i < n; i++)
+            {
+                if (samples[i].sampling_number > last_mouse_sample)
+                {
+                    accumulated_mouse_dx += samples[i].delta_x;
+                    accumulated_mouse_dy += samples[i].delta_y;
+                }
+                if (samples[i].sampling_number >= newest)
+                {
+                    newest = samples[i].sampling_number;
+                    newest_idx = i;
+                }
+            }
+        
+            if (n > 0)
+            {
+                gamepads[0].mouse = samples[newest_idx];
+                if (newest > last_mouse_sample)
+                    last_mouse_sample = newest;
+            }
+        }
+
+        // I only created these variables to make the names shorter :p
         auto& map = gamepads[0].current_map;
         auto& kb = gamepads[0].keyboard;
         auto& mouse = gamepads[0].mouse;
+
+        // Remove states from the last loop
+        gamepads[0].controller_state.buttons = 0;
+        gamepads[0].controller_state.analog_stick_l.x = 0;
+        gamepads[0].controller_state.analog_stick_l.y = 0;
+        gamepads[0].controller_state.analog_stick_r.x = 0;
+        gamepads[0].controller_state.analog_stick_r.y = 0;
+        gamepads[0].controller_state.attribute = 0;
 
         // Attach or Detach the virtual controller
         bool isConnected = false;
@@ -328,7 +335,6 @@ int main(int argc, char* argv[])
         if (isKeyPressed(kb, map.kb_stick_l_press, mouse, map.mouse_stick_l_press))
             gamepads[0].controller_state.buttons |= HidNpadButton_StickL;
 
-        // R stick
         if (isKeyPressed(kb, map.kb_stick_r_up))
             gamepads[0].controller_state.analog_stick_r.y = 32767;
 
@@ -347,58 +353,55 @@ int main(int argc, char* argv[])
         // Mouse
 
         // Sticks
-        if ( (map.mouse_controls_rStick == 1) || (map.mouse_controls_rStick == 2 && isKeyPressed(kb, map.kb_controls_rStick_button, mouse, map.mouse_controls_rStick_button)) ||
+        int mouse_dx = mouse.delta_x * 1280 * map.mouse_sensitivity;
+        int mouse_dy = mouse.delta_y * 1280 * map.mouse_sensitivity;
+
+        // R Stick
+        if ( (map.mouse_controls_rStick == 1) ||
+        (map.mouse_controls_rStick == 2 && isKeyPressed(kb, map.kb_controls_rStick_button, mouse, map.mouse_controls_rStick_button)) ||
         (map.mouse_controls_rStick == 3 && !isKeyPressed(kb, map.kb_controls_rStick_button, mouse, map.mouse_controls_rStick_button)))
         {
-            if (isKeyPressed(kb, map.kb_stick_r_left) || isKeyPressed(kb, map.kb_stick_r_right)) {}
-            else if (mouse.delta_x * (1280 * map.mouse_sensitivity) <= 32767 && mouse.delta_x * (1280 * map.mouse_sensitivity) >= -32767)
-                gamepads[0].controller_state.analog_stick_r.x = mouse.delta_x * (1280 * map.mouse_sensitivity);
+            if (!(isKeyPressed(kb,map.kb_stick_r_left) || isKeyPressed(kb,map.kb_stick_r_right)) && mouse_dx >= -32767 && mouse_dx <= 32767)
+                gamepads[0].controller_state.analog_stick_r.x = mouse_dx;
             else
             {
-                if (mouse.delta_x > 0)
-                    gamepads[0].controller_state.analog_stick_r.x = 32767;
-                if (mouse.delta_x < 0)
-                    gamepads[0].controller_state.analog_stick_r.x = -32767;
+                if (mouse.delta_x > 0) {gamepads[0].controller_state.analog_stick_r.x = 32767;}
+                if (mouse.delta_x < 0) {gamepads[0].controller_state.analog_stick_r.x = -32767;}
             }
-            if (isKeyPressed(kb, map.kb_stick_r_up) || isKeyPressed(kb, map.kb_stick_r_down)) {}
-            else if (mouse.delta_y * (1280 * map.mouse_sensitivity) <= 32767 && mouse.delta_y * (1280 * map.mouse_sensitivity) >= -32767)
-                gamepads[0].controller_state.analog_stick_r.y = mouse.delta_y * (-1280 * map.mouse_sensitivity);
+            if (!(isKeyPressed(kb,map.kb_stick_r_up) || isKeyPressed(kb,map.kb_stick_r_down)) && mouse_dy >= -32767 && mouse_dy <= 32767)
+                gamepads[0].controller_state.analog_stick_r.y = mouse_dy * -1;
             else
             {
-                if (mouse.delta_y > 0)
-                    gamepads[0].controller_state.analog_stick_r.y = -32767;
-                if (mouse.delta_y < 0)
-                    gamepads[0].controller_state.analog_stick_r.y = 32767;
+                if (mouse.delta_y > 0) {gamepads[0].controller_state.analog_stick_r.y = -32767;}
+                if (mouse.delta_y < 0) {gamepads[0].controller_state.analog_stick_r.y = 32767;}
             }
         }
 
-        if ( (map.mouse_controls_lStick == 1) || (map.mouse_controls_lStick == 2 && isKeyPressed(kb, map.kb_controls_lStick_button, mouse, map.mouse_controls_lStick_button)) ||
+        // L Stick
+        if ((map.mouse_controls_lStick == 1) ||
+        (map.mouse_controls_lStick == 2 && isKeyPressed(kb, map.kb_controls_lStick_button, mouse, map.mouse_controls_lStick_button)) ||
         (map.mouse_controls_lStick == 3 && !isKeyPressed(kb, map.kb_controls_lStick_button, mouse, map.mouse_controls_lStick_button)))
         {
-            if (isKeyPressed(kb, map.kb_stick_l_left) || isKeyPressed(kb, map.kb_stick_l_right)) {}
-            else if (mouse.delta_x * (1280 * map.mouse_sensitivity) <= 32767 && mouse.delta_x * (1280 * map.mouse_sensitivity) >= -32767)
-                gamepads[0].controller_state.analog_stick_l.x = mouse.delta_x * (1280 * map.mouse_sensitivity);
+            if (!(isKeyPressed(kb, map.kb_stick_l_left) || isKeyPressed(kb, map.kb_stick_l_right)) && mouse_dx >= -32767 && mouse_dx <= 32767)
+                gamepads[0].controller_state.analog_stick_l.x = mouse_dx;
             else
             {
-                if (mouse.delta_x > 0)
-                    gamepads[0].controller_state.analog_stick_l.x = 32767;
-                if (mouse.delta_x < 0)
-                    gamepads[0].controller_state.analog_stick_l.x = -32767;
+                if (mouse.delta_x > 0) {gamepads[0].controller_state.analog_stick_l.x = 32767;}
+                if (mouse.delta_x < 0) {gamepads[0].controller_state.analog_stick_l.x = -32767;}
             }
-            if (isKeyPressed(kb, map.kb_stick_l_up) || isKeyPressed(kb, map.kb_stick_l_down)) {}
-            else if (mouse.delta_y * (1280 * map.mouse_sensitivity) <= 32767 && mouse.delta_y * (1280 * map.mouse_sensitivity) >= -32767)
+            if (!(isKeyPressed(kb, map.kb_stick_l_up) || isKeyPressed(kb, map.kb_stick_l_down)) && mouse_dy >= -32767 && mouse_dy <= 32767)
                 gamepads[0].controller_state.analog_stick_l.y = mouse.delta_y * (-1280 * map.mouse_sensitivity);
             else
             {
-                if (mouse.delta_y > 0)
-                    gamepads[0].controller_state.analog_stick_l.y = -32767;
-                if (mouse.delta_y < 0)
-                    gamepads[0].controller_state.analog_stick_l.y = 32767;
+                if (mouse.delta_y > 0) {gamepads[0].controller_state.analog_stick_l.y = -32767;}
+                if (mouse.delta_y < 0) {gamepads[0].controller_state.analog_stick_l.y = 32767;}
             }
         }
 
+        // Gyroscope
         auto& m = gamepads[0].motion_attributes;
-        if ( (map.mouse_controls_gyro == 1) || (map.mouse_controls_gyro == 2 && isKeyPressed(kb, map.kb_controls_gyro_button, mouse, map.mouse_controls_gyro_button)) ||
+        if ((map.mouse_controls_gyro == 1) ||
+        (map.mouse_controls_gyro == 2 && isKeyPressed(kb, map.kb_controls_gyro_button, mouse, map.mouse_controls_gyro_button)) ||
         (map.mouse_controls_gyro == 3 && !isKeyPressed(kb, map.kb_controls_gyro_button, mouse, map.mouse_controls_gyro_button)))
         {
             const float k = m.sensibility * m.units_per_turn / m.counts_per_turn;
@@ -407,8 +410,8 @@ int main(int argc, char* argv[])
             const float dt = armTicksToNs(now - last_gyro_tick) / 1.0e9f;
             last_gyro_tick = now;
 
-            m.pending_yaw   += mouse_dx * k * m.yaw_sign;
-            m.pending_pitch += mouse_dy * k * m.pitch_sign;
+            m.pending_yaw   += accumulated_mouse_dx * k * m.yaw_sign;
+            m.pending_pitch += accumulated_mouse_dy * k * m.pitch_sign;
 
             float a = 1.0f;
             if (m.smoothing_ms > 0.0f)
