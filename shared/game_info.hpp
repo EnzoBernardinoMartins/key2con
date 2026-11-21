@@ -14,13 +14,13 @@ struct GameInfo
     std::string title_id;
 };
 
-std::vector<std::string> get_application_titles(FILE* log, const std::vector<u64>& application_ids)
+std::vector<std::string> get_application_titles(const std::vector<u64>& application_ids, FILE* log = NULL)
 {
     std::vector<std::string> titles;
 
     if (application_ids.empty())
         return titles;
-
+    
     AsyncValue async_value{};
     s32 count = static_cast<s32>(application_ids.size());
 
@@ -30,17 +30,18 @@ std::vector<std::string> get_application_titles(FILE* log, const std::vector<u64
 
     if (buffer == NULL)
     {
-        fprintf(log, "memalign failed: size=%zu\n", buffer_size);
-        fflush(log);
+        if (log != NULL) {
+            fprintf(log, "memalign failed: size=%zu\n", buffer_size);
+            fflush(log);}
         return titles;
     }
 
     Result rc = nsListApplicationTitle(&async_value, NsApplicationControlSource_Storage,
         application_ids.data(), count, buffer, buffer_size);
 
-    fprintf(log, "nsListApplicationTitle: rc=0x%08X, count=%d\n",
-        static_cast<unsigned int>(rc), count);
-    fflush(log);
+    if (log != NULL) {
+        fprintf(log, "nsListApplicationTitle: rc=0x%08X, count=%d\n", static_cast<unsigned int>(rc), count);
+        fflush(log);}
 
     if (R_FAILED(rc))
     {
@@ -56,9 +57,9 @@ std::vector<std::string> get_application_titles(FILE* log, const std::vector<u64
     if (R_SUCCEEDED(rc))
         rc = asyncValueGetSize(&async_value, &result_size);
 
-    fprintf(log, "async title result: rc=0x%08X, offset=%d, size=%llu\n",
-        static_cast<unsigned int>(rc), offset, static_cast<unsigned long long>(result_size));
-    fflush(log);
+    if (log != NULL) {
+        fprintf(log, "async title result: rc=0x%08X, offset=%d, size=%llu\n", static_cast<unsigned int>(rc), offset, static_cast<unsigned long long>(result_size));
+        fflush(log);}
 
     if (R_SUCCEEDED(rc) &&
         offset >= 0 &&
@@ -76,8 +77,9 @@ std::vector<std::string> get_application_titles(FILE* log, const std::vector<u64
     }
     else
     {
-        fprintf(log, "Invalid or failed application title data\n");
-        fflush(log);
+        if (log != NULL) {
+            fprintf(log, "Invalid or failed application title data\n");
+            fflush(log);}
     }
 
     asyncValueClose(&async_value);
@@ -86,7 +88,7 @@ std::vector<std::string> get_application_titles(FILE* log, const std::vector<u64
     return titles;
 };
 
-std::vector<GameInfo> get_recent_games_list(FILE* log)
+std::vector<GameInfo> get_recent_games_list(const size_t max_recent_games, FILE* log = NULL)
 {
     s32 total_entries = 0;
     s32 start_entry_index = 0;
@@ -95,9 +97,9 @@ std::vector<GameInfo> get_recent_games_list(FILE* log)
 
     Result rc = pdmqryGetAvailablePlayEventRange(&total_entries, &start_entry_index, &end_entry_index);
 
-    fprintf(log, "PDM range: rc=0x%08X, total=%d, start=%d, end=%d\n",
-        static_cast<unsigned int>(rc), total_entries, start_entry_index, end_entry_index);
-    fflush(log);
+    if (log != NULL) {
+        fprintf(log, "PDM range: rc=0x%08X, total=%d, start=%d, end=%d\n", static_cast<unsigned int>(rc), total_entries, start_entry_index, end_entry_index);
+        fflush(log);}
 
     if (R_FAILED(rc) || total_entries <= 0)
         return {};
@@ -106,9 +108,9 @@ std::vector<GameInfo> get_recent_games_list(FILE* log)
 
     rc = pdmqryQueryAppletEvent(start_entry_index, true, list.data(), total_entries, &total_out);
 
-    fprintf(log, "PDM query: rc=0x%08X, total_out=%d\n",
-        static_cast<unsigned int>(rc), total_out);
-    fflush(log);
+    if (log != NULL) {
+    fprintf(log, "PDM query: rc=0x%08X, total_out=%d\n", static_cast<unsigned int>(rc), total_out);
+    fflush(log);}
 
     if (R_FAILED(rc) || total_out <= 0)
         return {};
@@ -121,8 +123,6 @@ std::vector<GameInfo> get_recent_games_list(FILE* log)
         {
             return a.entry_index > b.entry_index;
         });
-
-    constexpr size_t max_recent_games = 40;
 
     std::vector<u64> applications_ids;
     std::unordered_set<u64> seen_ids;
@@ -141,10 +141,11 @@ std::vector<GameInfo> get_recent_games_list(FILE* log)
             applications_ids.push_back(program_id);
     }
 
-    fprintf(log, "Unique recent application IDs: %zu\n", applications_ids.size());
-    fflush(log);
+    if (log != NULL) {
+        fprintf(log, "Unique recent application IDs: %zu\n", applications_ids.size());
+        fflush(log);}
 
-    std::vector<std::string> titles = get_application_titles(log, applications_ids);
+    std::vector<std::string> titles = get_application_titles(applications_ids, log);
 
     std::vector<GameInfo> games;
 
@@ -165,8 +166,9 @@ std::vector<GameInfo> get_recent_games_list(FILE* log)
         games.push_back(game);
     }
 
-    fprintf(log, "Games loaded: %zu\n", games.size());
-    fflush(log);
+    if (log != NULL) {
+        fprintf(log, "Games loaded: %zu\n", games.size());
+        fflush(log);}
 
     return games;
 };

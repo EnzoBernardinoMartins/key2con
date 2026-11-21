@@ -4,6 +4,18 @@
 #include <vector>
 #include <switch.h>
 
+struct GyroConfig
+{
+    float counts_per_turn = 4000.0f;
+    float units_per_turn = 1.0f;
+    float sensibility = 1.0f;
+    float yaw_sign = -1.0f;
+    float pitch_sign = -1.0f;
+    float smoothing_ms = 12.0f;
+    float pending_yaw = 0.0f;
+    float pending_pitch = 0.0f;
+};
+
 struct Config
 {
     std::vector<HidKeyboardKey> kb_dpad_up;
@@ -42,6 +54,9 @@ struct Config
     std::vector<HidKeyboardKey> kb_controls_rStick_button;
     std::vector<HidKeyboardKey> kb_controls_lStick_button;
 
+    std::vector<HidKeyboardKey> kb_stick_l_sensitivity_modifier_button;
+    std::vector<HidKeyboardKey> kb_stick_r_sensitivity_modifier_button;
+
     std::vector<HidMouseButton> mouse_dpad_up;
     std::vector<HidMouseButton> mouse_dpad_down;
     std::vector<HidMouseButton> mouse_dpad_left;
@@ -66,13 +81,22 @@ struct Config
     std::vector<HidMouseButton> mouse_stick_r_press;
 
     std::vector<HidMouseButton> mouse_controls_gyro_button;
-    std::vector<HidMouseButton> mouse_controls_rStick_button;
     std::vector<HidMouseButton> mouse_controls_lStick_button;
+    std::vector<HidMouseButton> mouse_controls_rStick_button;
 
-    float mouse_sensitivity = 1.0f;
-    int mouse_controls_gyro = 0;
-    int mouse_controls_rStick = 0;
+    std::vector<HidMouseButton> mouse_stick_l_sensitivity_modifier_button;
+    std::vector<HidMouseButton> mouse_stick_r_sensitivity_modifier_button;
+
+    GyroConfig motion_attributes;
+
+    float stick_l_sensitivity = 1.0f;
+    float stick_r_sensitivity = 1.0f;
     int mouse_controls_lStick = 0;
+    int mouse_controls_rStick = 0;
+    int mouse_controls_gyro = 0;
+
+    int stick_l_sensitivity_modifier_mode = 0;
+    int stick_r_sensitivity_modifier_mode = 0;
 };
 
 struct ProfileSection

@@ -4,18 +4,6 @@
 #include <string>
 #include "config_struct.hpp"
 
-struct GyroConfig
-{
-    float counts_per_turn = 4000.0f;
-    float units_per_turn = 1.0f;
-    float sensibility = 1.0f;
-    float yaw_sign = -1.0f;
-    float pitch_sign = -1.0f;
-    float smoothing_ms = 12.0f;
-    float pending_yaw = 0.0f;
-    float pending_pitch = 0.0f;
-};
-
 struct VirtualDevice_K2C
 {
     bool isEnable = false;
@@ -32,5 +20,11 @@ struct VirtualDevice_K2C
 
     std::string profile_path;
     Config current_map;
-    GyroConfig motion_attributes;
+
+    bool stick_l_sensitivity_modifier_toggle = false;
+    bool stick_r_sensitivity_modifier_toggle = false;
+
+    bool mouse_as_stick_l_toggle = false;
+    bool mouse_as_stick_r_toggle = false;
+    bool mouse_as_gyro_toggle = false;
 };

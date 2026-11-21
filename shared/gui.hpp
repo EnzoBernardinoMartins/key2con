@@ -13,7 +13,7 @@ struct UiMenu
 void show_UiMenu(UiMenu ui_menu, int selection)
 {
     std::cout << "  " << ui_menu.title << "\n\n";
-    for (int i = 0; i < ui_menu.options.size(); i++)
+    for (int i = 0; i < static_cast<int>(ui_menu.options.size()); i++)
     {
         if (i == selection)
             std::cout << "> ";
@@ -21,7 +21,7 @@ void show_UiMenu(UiMenu ui_menu, int selection)
         std::cout << ui_menu.options[i] << "\n";
     }
 
-    for (int i = 0; i < 44 - ui_menu.options.size() - 3; i++)
+    for (int i = 0; i < 44 - static_cast<int>(ui_menu.options.size()) - 3; i++)
         std::cout << "\n";
     std::cout << ui_menu.instructions;
 }

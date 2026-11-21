@@ -9,7 +9,7 @@ endif
 TOPDIR ?= $(CURDIR)
 include $(DEVKITPRO)/libnx/switch_rules
 
-TARGET		:=	$(notdir $(CURDIR))
+TARGET		:=	exefs
 BUILD		:=	build
 SOURCES		:=	source
 DATA		:=	data

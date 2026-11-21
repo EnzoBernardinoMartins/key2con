@@ -14,7 +14,7 @@ DATA		:=	data
 INCLUDES	:=	include
 APP_TITLE   :=	key2con
 APP_AUTHOR  :=	RedsonBW
-APP_VERSION	:=  0.2.0
+APP_VERSION	:=  0.2.1
 ICON		:=  icon.jpg
 
 ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE

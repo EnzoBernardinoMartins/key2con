@@ -169,6 +169,11 @@ int main(int argc, char* argv[])
     load_config_file(log, gamepads[0].current_map, gamepads[0].profile_path, "global");
 
     // Variables
+    bool stick_l_sensitivity_modifier_was_toggled = false;
+    bool stick_r_sensitivity_modifier_was_toggled = false;
+    bool mouse_as_stick_l_was_toggled = false;
+    bool mouse_as_stick_r_was_toggled = false;
+    bool mouse_as_gyro_was_toggled = false;
     u64 pid = 0;
     u64 program_id = 0;
     u64 old_program_id = 0;
@@ -209,32 +214,33 @@ int main(int argc, char* argv[])
 
         // Accumulates mouse deltas for the gyro and returns the values ​​from the latest sample to the rest of the code.
         s32 accumulated_mouse_dx = 0, accumulated_mouse_dy = 0;
+        HidMouseState samples[7];
+        size_t sample_quant = hidGetMouseStates(samples, 7);
+        int new_sample_quant = 0;
+    
+        u64 newest = 0;
+        size_t newest_idx = 0;
+        for (size_t i = 0; i < sample_quant; i++)
         {
-            HidMouseState samples[7];
-            size_t n = hidGetMouseStates(samples, 7);
-        
-            u64 newest = 0;
-            size_t newest_idx = 0;
-            for (size_t i = 0; i < n; i++)
+            if (samples[i].sampling_number > last_mouse_sample)
             {
-                if (samples[i].sampling_number > last_mouse_sample)
-                {
-                    accumulated_mouse_dx += samples[i].delta_x;
-                    accumulated_mouse_dy += samples[i].delta_y;
-                }
-                if (samples[i].sampling_number >= newest)
-                {
-                    newest = samples[i].sampling_number;
-                    newest_idx = i;
-                }
+                accumulated_mouse_dx += samples[i].delta_x;
+                accumulated_mouse_dy += samples[i].delta_y;
+
+                new_sample_quant++;
             }
-        
-            if (n > 0)
+            if (samples[i].sampling_number >= newest)
             {
-                gamepads[0].mouse = samples[newest_idx];
-                if (newest > last_mouse_sample)
-                    last_mouse_sample = newest;
+                newest = samples[i].sampling_number;
+                newest_idx = i;
             }
+        }
+    
+        if (sample_quant > 0)
+        {
+            gamepads[0].mouse = samples[newest_idx];
+            if (newest > last_mouse_sample)
+                last_mouse_sample = newest;
         }
 
         // I only created these variables to make the names shorter :p
@@ -264,44 +270,35 @@ int main(int argc, char* argv[])
                 hiddbgDetachHdlsVirtualDevice(gamepads[0].hdls_handle);
         }
 
-        // Keyboard
+        // Adding values ​​assigned to keyboard and mouse keys and buttons in the virtual controller
 
         // D-pad
         if (isKeyPressed(kb, map.kb_dpad_up, mouse, map.mouse_dpad_up))
             gamepads[0].controller_state.buttons |= HidNpadButton_Up;
-
         if (isKeyPressed(kb, map.kb_dpad_down, mouse, map.mouse_dpad_down))
             gamepads[0].controller_state.buttons |= HidNpadButton_Down;
-
         if (isKeyPressed(kb, map.kb_dpad_left, mouse, map.mouse_dpad_left))
             gamepads[0].controller_state.buttons |= HidNpadButton_Left;
-
         if (isKeyPressed(kb, map.kb_dpad_right, mouse, map.mouse_dpad_right))
             gamepads[0].controller_state.buttons |= HidNpadButton_Right;
 
         // BAYX
         if (isKeyPressed(kb, map.kb_button_a, mouse, map.mouse_button_a))
             gamepads[0].controller_state.buttons |= HidNpadButton_A;
-
         if (isKeyPressed(kb, map.kb_button_b, mouse, map.mouse_button_b))
             gamepads[0].controller_state.buttons |= HidNpadButton_B;
-
         if (isKeyPressed(kb, map.kb_button_x, mouse, map.mouse_button_x))
             gamepads[0].controller_state.buttons |= HidNpadButton_X;
-
         if (isKeyPressed(kb, map.kb_button_y, mouse, map.mouse_button_y))
             gamepads[0].controller_state.buttons |= HidNpadButton_Y;
 
         // Triggers and Bumpers
         if (isKeyPressed(kb, map.kb_button_L, mouse, map.mouse_button_L))
             gamepads[0].controller_state.buttons |= HidNpadButton_L;
-
         if (isKeyPressed(kb, map.kb_button_R, mouse, map.mouse_button_R))
             gamepads[0].controller_state.buttons |= HidNpadButton_R;
-
         if (isKeyPressed(kb, map.kb_button_ZL, mouse, map.mouse_button_ZL))
             gamepads[0].controller_state.buttons |= HidNpadButton_ZL;
-
         if (isKeyPressed(kb, map.kb_button_ZR, mouse, map.mouse_button_ZR))
             gamepads[0].controller_state.buttons |= HidNpadButton_ZR;
 
@@ -309,99 +306,153 @@ int main(int argc, char* argv[])
 
         if (isKeyPressed(kb, map.kb_button_plus, mouse, map.mouse_button_plus))
             gamepads[0].controller_state.buttons |= HidNpadButton_Plus;
-
         if (isKeyPressed(kb, map.kb_button_minus, mouse, map.mouse_button_minus))
             gamepads[0].controller_state.buttons |= HidNpadButton_Minus;
-
         if (isKeyPressed(kb, map.kb_button_capture, mouse, map.mouse_button_capture))
             gamepads[0].controller_state.buttons |= HiddbgNpadButton_Capture;
-
         if (isKeyPressed(kb, map.kb_button_home, mouse, map.mouse_button_home))
             gamepads[0].controller_state.buttons |= HiddbgNpadButton_Home;
 
+        // Toggles
+
+        if (map.stick_l_sensitivity_modifier_mode == 3 &&
+        justPressed(isKeyPressed(kb, map.kb_stick_l_sensitivity_modifier_button, mouse, map.mouse_stick_l_sensitivity_modifier_button), stick_l_sensitivity_modifier_was_toggled))
+            gamepads[0].stick_l_sensitivity_modifier_toggle ? gamepads[0].stick_l_sensitivity_modifier_toggle = false : gamepads[0].stick_l_sensitivity_modifier_toggle = true;
+        if (map.stick_r_sensitivity_modifier_mode == 3 &&
+        justPressed(isKeyPressed(kb, map.kb_stick_r_sensitivity_modifier_button, mouse, map.mouse_stick_r_sensitivity_modifier_button), stick_r_sensitivity_modifier_was_toggled))
+            gamepads[0].stick_r_sensitivity_modifier_toggle ? gamepads[0].stick_r_sensitivity_modifier_toggle = false : gamepads[0].stick_r_sensitivity_modifier_toggle = true;
+        if (map.mouse_controls_lStick == 4 &&
+        justPressed(isKeyPressed(kb, map.kb_controls_lStick_button, mouse, map.mouse_controls_lStick_button), mouse_as_stick_l_was_toggled))
+            gamepads[0].mouse_as_stick_l_toggle ? gamepads[0].mouse_as_stick_l_toggle = false : gamepads[0].mouse_as_stick_l_toggle = true;
+        if (map.mouse_controls_rStick == 4 &&
+        justPressed(isKeyPressed(kb, map.kb_controls_rStick_button, mouse, map.mouse_controls_rStick_button), mouse_as_stick_r_was_toggled))
+            gamepads[0].mouse_as_stick_r_toggle ? gamepads[0].mouse_as_stick_r_toggle = false : gamepads[0].mouse_as_stick_r_toggle = true;
+        if (map.mouse_controls_gyro == 4 &&
+        justPressed(isKeyPressed(kb, map.kb_controls_gyro_button, mouse, map.mouse_controls_gyro_button), mouse_as_gyro_was_toggled))
+            gamepads[0].mouse_as_gyro_toggle ? gamepads[0].mouse_as_gyro_toggle = false : gamepads[0].mouse_as_gyro_toggle = true;
+
+        // Sticks
         // L stick
+
+        int l_stick_pos = 0;
+        if ( (map.stick_l_sensitivity_modifier_mode == 0) || (map.stick_l_sensitivity_modifier_mode == 3 && gamepads[0].stick_l_sensitivity_modifier_toggle) ||
+        (map.stick_l_sensitivity_modifier_mode == 1 && isKeyPressed(kb, map.kb_stick_l_sensitivity_modifier_button, mouse, map.mouse_stick_l_sensitivity_modifier_button)) ||
+        (map.stick_l_sensitivity_modifier_mode == 2 && !(isKeyPressed(kb, map.kb_stick_l_sensitivity_modifier_button, mouse, map.mouse_stick_l_sensitivity_modifier_button))))
+            l_stick_pos = map.stick_l_sensitivity < 1 ? 32767 * map.stick_l_sensitivity : 32767;
+        else
+            l_stick_pos = 32767;
+
         if (isKeyPressed(kb, map.kb_stick_l_up))
-            gamepads[0].controller_state.analog_stick_l.y = 32767;
-
+            gamepads[0].controller_state.analog_stick_l.y = l_stick_pos;
         else if (isKeyPressed(kb, map.kb_stick_l_down))
-            gamepads[0].controller_state.analog_stick_l.y = -32767;
-
+            gamepads[0].controller_state.analog_stick_l.y = -l_stick_pos;
         if (isKeyPressed(kb, map.kb_stick_l_left))
-            gamepads[0].controller_state.analog_stick_l.x = -32767;
-
+            gamepads[0].controller_state.analog_stick_l.x = -l_stick_pos;
         else if (isKeyPressed(kb, map.kb_stick_l_right))
-            gamepads[0].controller_state.analog_stick_l.x = 32767;
-
+            gamepads[0].controller_state.analog_stick_l.x = l_stick_pos;
         if (isKeyPressed(kb, map.kb_stick_l_press, mouse, map.mouse_stick_l_press))
             gamepads[0].controller_state.buttons |= HidNpadButton_StickL;
 
+        // R stick
+
+        int r_stick_pos = 0;
+        if ( (map.stick_r_sensitivity_modifier_mode == 0) || (map.stick_r_sensitivity_modifier_mode == 3 && gamepads[0].stick_r_sensitivity_modifier_toggle) ||
+        (map.stick_r_sensitivity_modifier_mode == 1 && isKeyPressed(kb, map.kb_stick_r_sensitivity_modifier_button, mouse, map.mouse_stick_r_sensitivity_modifier_button)) ||
+        (map.stick_r_sensitivity_modifier_mode == 2 && !(isKeyPressed(kb, map.kb_stick_r_sensitivity_modifier_button, mouse, map.mouse_stick_r_sensitivity_modifier_button))))
+            r_stick_pos = map.stick_r_sensitivity < 1 ? 32767 * map.stick_r_sensitivity : 32767;
+        else
+            r_stick_pos = 32767;
+
         if (isKeyPressed(kb, map.kb_stick_r_up))
-            gamepads[0].controller_state.analog_stick_r.y = 32767;
-
+            gamepads[0].controller_state.analog_stick_r.y = r_stick_pos;
         else if (isKeyPressed(kb, map.kb_stick_r_down))
-            gamepads[0].controller_state.analog_stick_r.y = -32767;
-
+            gamepads[0].controller_state.analog_stick_r.y = -r_stick_pos;
         if (isKeyPressed(kb, map.kb_stick_r_left))
-            gamepads[0].controller_state.analog_stick_r.x = -32767;
-
+            gamepads[0].controller_state.analog_stick_r.x = -r_stick_pos;
         else if (isKeyPressed(kb, map.kb_stick_r_right))
-            gamepads[0].controller_state.analog_stick_r.x = 32767;
-
+            gamepads[0].controller_state.analog_stick_r.x = r_stick_pos;
         if (isKeyPressed(kb, map.kb_stick_r_press, mouse, map.mouse_stick_r_press))
             gamepads[0].controller_state.buttons |= HidNpadButton_StickR;
 
         // Mouse
-
         // Sticks
-        int mouse_dx = mouse.delta_x * 1280 * map.mouse_sensitivity;
-        int mouse_dy = mouse.delta_y * 1280 * map.mouse_sensitivity;
+        int mouse_dx = mouse.delta_x * 1280;
+        int mouse_dy = mouse.delta_y * 1280;
 
         // R Stick
-        if ( (map.mouse_controls_rStick == 1) ||
-        (map.mouse_controls_rStick == 2 && isKeyPressed(kb, map.kb_controls_rStick_button, mouse, map.mouse_controls_rStick_button)) ||
-        (map.mouse_controls_rStick == 3 && !isKeyPressed(kb, map.kb_controls_rStick_button, mouse, map.mouse_controls_rStick_button)))
         {
-            if (!(isKeyPressed(kb,map.kb_stick_r_left) || isKeyPressed(kb,map.kb_stick_r_right)) && mouse_dx >= -32767 && mouse_dx <= 32767)
-                gamepads[0].controller_state.analog_stick_r.x = mouse_dx;
-            else
+            int dx = mouse_dx;
+            int dy = mouse_dy;
+            if ( (map.stick_r_sensitivity_modifier_mode == 0) || (map.stick_r_sensitivity_modifier_mode == 3 && gamepads[0].stick_r_sensitivity_modifier_toggle) ||
+            (map.stick_r_sensitivity_modifier_mode == 1 && isKeyPressed(kb, map.kb_stick_r_sensitivity_modifier_button, mouse, map.mouse_stick_r_sensitivity_modifier_button)) ||
+            (map.stick_r_sensitivity_modifier_mode == 2 && !(isKeyPressed(kb, map.kb_stick_r_sensitivity_modifier_button, mouse, map.mouse_stick_r_sensitivity_modifier_button))))
             {
-                if (mouse.delta_x > 0) {gamepads[0].controller_state.analog_stick_r.x = 32767;}
-                if (mouse.delta_x < 0) {gamepads[0].controller_state.analog_stick_r.x = -32767;}
+                dx = mouse_dx * map.stick_r_sensitivity;
+                dy = mouse_dy * map.stick_r_sensitivity;
             }
-            if (!(isKeyPressed(kb,map.kb_stick_r_up) || isKeyPressed(kb,map.kb_stick_r_down)) && mouse_dy >= -32767 && mouse_dy <= 32767)
-                gamepads[0].controller_state.analog_stick_r.y = mouse_dy * -1;
-            else
+
+            if ( (map.mouse_controls_rStick == 1) || (map.mouse_controls_rStick == 4 && gamepads[0].mouse_as_stick_r_toggle) ||
+            (map.mouse_controls_rStick == 2 && isKeyPressed(kb, map.kb_controls_rStick_button, mouse, map.mouse_controls_rStick_button)) ||
+            (map.mouse_controls_rStick == 3 && !isKeyPressed(kb, map.kb_controls_rStick_button, mouse, map.mouse_controls_rStick_button)))
             {
-                if (mouse.delta_y > 0) {gamepads[0].controller_state.analog_stick_r.y = -32767;}
-                if (mouse.delta_y < 0) {gamepads[0].controller_state.analog_stick_r.y = 32767;}
+                if (!(isKeyPressed(kb,map.kb_stick_r_left) || isKeyPressed(kb,map.kb_stick_r_right)) && dx >= -32767 && dx <= 32767)
+                    gamepads[0].controller_state.analog_stick_r.x = dx;
+                else
+                {
+                    if (mouse.delta_x > 0) {gamepads[0].controller_state.analog_stick_r.x = 32767;}
+                    if (mouse.delta_x < 0) {gamepads[0].controller_state.analog_stick_r.x = -32767;}
+                }
+                if (!(isKeyPressed(kb,map.kb_stick_r_up) || isKeyPressed(kb,map.kb_stick_r_down)) && dy >= -32767 && dy <= 32767)
+                    gamepads[0].controller_state.analog_stick_r.y = dy * -1;
+                else
+                {
+                    if (mouse.delta_y > 0) {gamepads[0].controller_state.analog_stick_r.y = -32767;}
+                    if (mouse.delta_y < 0) {gamepads[0].controller_state.analog_stick_r.y = 32767;}
+                }
             }
         }
 
         // L Stick
-        if ((map.mouse_controls_lStick == 1) ||
-        (map.mouse_controls_lStick == 2 && isKeyPressed(kb, map.kb_controls_lStick_button, mouse, map.mouse_controls_lStick_button)) ||
-        (map.mouse_controls_lStick == 3 && !isKeyPressed(kb, map.kb_controls_lStick_button, mouse, map.mouse_controls_lStick_button)))
         {
-            if (!(isKeyPressed(kb, map.kb_stick_l_left) || isKeyPressed(kb, map.kb_stick_l_right)) && mouse_dx >= -32767 && mouse_dx <= 32767)
-                gamepads[0].controller_state.analog_stick_l.x = mouse_dx;
-            else
+            int dx = mouse_dx;
+            int dy = mouse_dy;
+            if ( (map.stick_l_sensitivity_modifier_mode == 0) || (map.stick_l_sensitivity_modifier_mode == 3 && gamepads[0].stick_l_sensitivity_modifier_toggle) ||
+            (map.stick_l_sensitivity_modifier_mode == 1 && isKeyPressed(kb, map.kb_stick_l_sensitivity_modifier_button, mouse, map.mouse_stick_l_sensitivity_modifier_button)) ||
+            (map.stick_l_sensitivity_modifier_mode == 2 && !(isKeyPressed(kb, map.kb_stick_l_sensitivity_modifier_button, mouse, map.mouse_stick_l_sensitivity_modifier_button))))
             {
-                if (mouse.delta_x > 0) {gamepads[0].controller_state.analog_stick_l.x = 32767;}
-                if (mouse.delta_x < 0) {gamepads[0].controller_state.analog_stick_l.x = -32767;}
+                dx = mouse_dx * map.stick_l_sensitivity;
+                dy = mouse_dy * map.stick_l_sensitivity;
             }
-            if (!(isKeyPressed(kb, map.kb_stick_l_up) || isKeyPressed(kb, map.kb_stick_l_down)) && mouse_dy >= -32767 && mouse_dy <= 32767)
-                gamepads[0].controller_state.analog_stick_l.y = mouse.delta_y * (-1280 * map.mouse_sensitivity);
-            else
+
+            if ((map.mouse_controls_lStick == 1) || (map.mouse_controls_lStick == 4 && gamepads[0].mouse_as_stick_l_toggle) ||
+            (map.mouse_controls_lStick == 2 && isKeyPressed(kb, map.kb_controls_lStick_button, mouse, map.mouse_controls_lStick_button)) ||
+            (map.mouse_controls_lStick == 3 && !isKeyPressed(kb, map.kb_controls_lStick_button, mouse, map.mouse_controls_lStick_button)))
             {
-                if (mouse.delta_y > 0) {gamepads[0].controller_state.analog_stick_l.y = -32767;}
-                if (mouse.delta_y < 0) {gamepads[0].controller_state.analog_stick_l.y = 32767;}
+                if (!(isKeyPressed(kb, map.kb_stick_l_left) || isKeyPressed(kb, map.kb_stick_l_right)) && dx >= -32767 && dx <= 32767)
+                    gamepads[0].controller_state.analog_stick_l.x = dx;
+                else
+                {
+                    if (mouse.delta_x > 0) {gamepads[0].controller_state.analog_stick_l.x = 32767;}
+                    if (mouse.delta_x < 0) {gamepads[0].controller_state.analog_stick_l.x = -32767;}
+                }
+                if (!(isKeyPressed(kb, map.kb_stick_l_up) || isKeyPressed(kb, map.kb_stick_l_down)) && dy >= -32767 && dy <= 32767)
+                    gamepads[0].controller_state.analog_stick_l.y = dy;
+                else
+                {
+                    if (mouse.delta_y > 0) {gamepads[0].controller_state.analog_stick_l.y = -32767;}
+                    if (mouse.delta_y < 0) {gamepads[0].controller_state.analog_stick_l.y = 32767;}
+                }
             }
         }
 
         // Gyroscope
-        auto& m = gamepads[0].motion_attributes;
+        auto& m = map.motion_attributes;
+        auto dx = new_sample_quant != 0 ? accumulated_mouse_dx / new_sample_quant : accumulated_mouse_dx;
+        auto dy = new_sample_quant != 0 ? accumulated_mouse_dy / new_sample_quant : accumulated_mouse_dy;
+
         if ((map.mouse_controls_gyro == 1) ||
         (map.mouse_controls_gyro == 2 && isKeyPressed(kb, map.kb_controls_gyro_button, mouse, map.mouse_controls_gyro_button)) ||
+        (map.mouse_controls_gyro == 4 && gamepads[0].mouse_as_gyro_toggle) ||
         (map.mouse_controls_gyro == 3 && !isKeyPressed(kb, map.kb_controls_gyro_button, mouse, map.mouse_controls_gyro_button)))
         {
             const float k = m.sensibility * m.units_per_turn / m.counts_per_turn;
@@ -410,8 +461,8 @@ int main(int argc, char* argv[])
             const float dt = armTicksToNs(now - last_gyro_tick) / 1.0e9f;
             last_gyro_tick = now;
 
-            m.pending_yaw   += accumulated_mouse_dx * k * m.yaw_sign;
-            m.pending_pitch += accumulated_mouse_dy * k * m.pitch_sign;
+            m.pending_yaw   += dx * k * m.yaw_sign;
+            m.pending_pitch += dy * k * m.pitch_sign;
 
             float a = 1.0f;
             if (m.smoothing_ms > 0.0f)

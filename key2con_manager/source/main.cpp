@@ -53,7 +53,7 @@ int main(void)
     fprintf(log, "Before get_recent_games_list\n");
     fflush(log);
 
-    std::vector<GameInfo> last_played_games = get_recent_games_list(log);
+    std::vector<GameInfo> last_played_games = get_recent_games_list(40, log);
 
     fprintf(log, "After get_recent_games_list: %zu games\n", last_played_games.size());
     fflush(log);
@@ -115,7 +115,7 @@ int main(void)
                         fclose(boot2_flag);
                         AutoStart = true;
                     }
-                    else if (AutoStart == true)
+                    else
                     {
                         remove("sdmc:/atmosphere/contents/41000000000E2C00/flags/boot2.flag");
                         AutoStart = false;
@@ -277,8 +277,8 @@ int main(void)
             }
 
             if (gui_selection < 0)
-                gui_selection = 28;
-            if (gui_selection > 28)
+                gui_selection = 25;
+            if (gui_selection > 25)
                 gui_selection = 0;
 
             GetInputResult gir;
@@ -316,9 +316,6 @@ int main(void)
             if (gui_selection == 23) {map_config_kb_struct(current_config.kb_stick_r_down, gir.key_received, gir.button_received, actions);}
             if (gui_selection == 24) {map_config_kb_struct(current_config.kb_stick_r_left, gir.key_received, gir.button_received, actions);}
             if (gui_selection == 25) {map_config_kb_struct(current_config.kb_stick_r_right, gir.key_received, gir.button_received, actions);}
-            if (gui_selection == 26) {map_config_kbm_struct(current_config.kb_controls_gyro_button, current_config.mouse_controls_gyro_button, gir.key_received, gir.button_received, actions);}
-            if (gui_selection == 27) {map_config_kbm_struct(current_config.kb_controls_lStick_button, current_config.mouse_controls_lStick_button, gir.key_received, gir.button_received, actions);}
-            if (gui_selection == 28) {map_config_kbm_struct(current_config.kb_controls_rStick_button, current_config.mouse_controls_rStick_button, gir.key_received, gir.button_received, actions);}
 
             while (hidKeyboardStateGetKey(&keyboard, HidKeyboardKey_Escape))
             {
@@ -350,21 +347,17 @@ int main(void)
                 "Button Capture: " + keyboard_mouse_vectors_to_string(current_config.kb_button_capture, current_config.mouse_button_capture),
                 "Button Home: " + keyboard_mouse_vectors_to_string(current_config.kb_button_home, current_config.mouse_button_home),
 
-                "lStick Press: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_l_press, current_config.mouse_stick_l_press),
-                "lStick Up: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_l_up),
-                "lStick Down: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_l_down),
-                "lStick Left: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_l_left),
-                "lStick Right: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_l_right),
+                "L Stick Press: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_l_press, current_config.mouse_stick_l_press),
+                "L Stick Up: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_l_up),
+                "L Stick Down: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_l_down),
+                "L Stick Left: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_l_left),
+                "L Stick Right: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_l_right),
 
-                "rStick Press: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_r_press, current_config.mouse_stick_r_press),
-                "rStick Up: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_r_up),
-                "rStick Down: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_r_down),
-                "rStick Left: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_r_left),
-                "rStick Right: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_r_right),
-            
-                "Controls gyro Button: " + keyboard_mouse_vectors_to_string(current_config.kb_controls_gyro_button, current_config.mouse_controls_gyro_button),
-                "Controls lStick Button: " + keyboard_mouse_vectors_to_string(current_config.kb_controls_lStick_button, current_config.mouse_controls_lStick_button),
-                "Controls rStick Button: " + keyboard_mouse_vectors_to_string(current_config.kb_controls_rStick_button, current_config.mouse_controls_rStick_button)};
+                "R Stick Press: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_r_press, current_config.mouse_stick_r_press),
+                "R Stick Up: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_r_up),
+                "R Stick Down: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_r_down),
+                "R Stick Left: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_r_left),
+                "R Stick Right: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_r_right)};
             control_mapping.instructions = "Enter=map|Esc=return|Del=remove last map";
 
             show_UiMenu(control_mapping, gui_selection);
@@ -385,9 +378,18 @@ int main(void)
             }
 
             if (gui_selection < 0)
-                gui_selection = 3;
-            if (gui_selection > 3)
+                gui_selection = 12;
+            if (gui_selection > 12)
                 gui_selection = 0;
+
+            GetInputResult gir;
+            if (actions.Selected && (gui_selection == 1 || gui_selection == 3 || gui_selection == 5 || gui_selection == 8 || gui_selection == 11))
+            {
+                consoleClear();
+                printf("Waiting for input...");
+                consoleUpdate(NULL);
+                gir = GetKeyboardMouseInput(keyboard, mouse);
+            }
 
             if (gui_selection == 0)
             {
@@ -397,13 +399,14 @@ int main(void)
                     current_config.mouse_controls_lStick--;
                 
                 if (current_config.mouse_controls_lStick < 0)
-                    current_config.mouse_controls_lStick = 3;
-                if (current_config.mouse_controls_lStick > 3)
+                    current_config.mouse_controls_lStick = 4;
+                if (current_config.mouse_controls_lStick > 4)
                     current_config.mouse_controls_lStick = 0;
             }
 
+            if (gui_selection == 1) {map_config_kbm_struct(current_config.kb_controls_lStick_button, current_config.mouse_controls_lStick_button, gir.key_received, gir.button_received, actions);}
 
-            if (gui_selection == 1)
+            if (gui_selection == 2)
             {
                 if (actions.Selected)
                     current_config.mouse_controls_rStick++;
@@ -411,12 +414,14 @@ int main(void)
                     current_config.mouse_controls_rStick--;
                 
                 if (current_config.mouse_controls_rStick < 0)
-                    current_config.mouse_controls_rStick = 3;
-                if (current_config.mouse_controls_rStick > 3)
+                    current_config.mouse_controls_rStick = 4;
+                if (current_config.mouse_controls_rStick > 4)
                     current_config.mouse_controls_rStick = 0;
             }
 
-            if (gui_selection == 2)
+            if (gui_selection == 3) {map_config_kbm_struct(current_config.kb_controls_rStick_button, current_config.mouse_controls_rStick_button, gir.key_received, gir.button_received, actions);}
+
+            if (gui_selection == 4)
             {
                 if (actions.Selected)
                     current_config.mouse_controls_gyro++;
@@ -424,29 +429,89 @@ int main(void)
                     current_config.mouse_controls_gyro--;
                 
                 if (current_config.mouse_controls_gyro < 0)
-                    current_config.mouse_controls_gyro = 3;
-                if (current_config.mouse_controls_gyro > 3)
+                    current_config.mouse_controls_gyro = 4;
+                if (current_config.mouse_controls_gyro > 4)
                     current_config.mouse_controls_gyro = 0;
             }
 
-            if (gui_selection == 3)
+            if (gui_selection == 5) {map_config_kbm_struct(current_config.kb_controls_gyro_button, current_config.mouse_controls_gyro_button, gir.key_received, gir.button_received, actions);}
+
+            if (gui_selection == 6)
             {
                 if (actions.Selected)
-                    current_config.mouse_sensitivity += 0.10f;
+                    current_config.stick_l_sensitivity += 0.10f;
                 if (actions.Deleted)
-                    current_config.mouse_sensitivity -= 0.10f;
+                    current_config.stick_l_sensitivity -= 0.10f;
+            }
+
+            if (gui_selection == 7)
+            {
+                if (actions.Selected)
+                    current_config.stick_l_sensitivity_modifier_mode++;
+                if (actions.Deleted)
+                    current_config.stick_l_sensitivity_modifier_mode--;
+                
+                if (current_config.stick_l_sensitivity_modifier_mode < 0)
+                    current_config.stick_l_sensitivity_modifier_mode = 3;
+                if (current_config.stick_l_sensitivity_modifier_mode > 3)
+                    current_config.stick_l_sensitivity_modifier_mode = 0;
+            }
+
+            if (gui_selection == 8)
+                map_config_kbm_struct(current_config.kb_stick_l_sensitivity_modifier_button, current_config.mouse_stick_l_sensitivity_modifier_button, gir.key_received, gir.button_received, actions);
+
+            if (gui_selection == 9)
+            {
+                if (actions.Selected)
+                    current_config.stick_r_sensitivity += 0.10f;
+                if (actions.Deleted)
+                    current_config.stick_r_sensitivity -= 0.10f;
+            }
+
+            if (gui_selection == 10)
+            {
+                if (actions.Selected)
+                    current_config.stick_r_sensitivity_modifier_mode++;
+                if (actions.Deleted)
+                    current_config.stick_r_sensitivity_modifier_mode--;
+                
+                if (current_config.stick_r_sensitivity_modifier_mode < 0)
+                    current_config.stick_r_sensitivity_modifier_mode = 3;
+                if (current_config.stick_r_sensitivity_modifier_mode > 3)
+                    current_config.stick_r_sensitivity_modifier_mode = 0;
+            }
+
+            if (gui_selection == 11)
+                map_config_kbm_struct(current_config.kb_stick_r_sensitivity_modifier_button, current_config.mouse_stick_r_sensitivity_modifier_button, gir.key_received, gir.button_received, actions);
+
+            if (gui_selection == 12)
+            {
+                if (actions.Selected)
+                    current_config.motion_attributes.sensibility += 0.10f;
+                if (actions.Deleted)
+                    current_config.motion_attributes.sensibility -= 0.10f;
             }
 
             // Front-End
             UiMenu configuration;
             configuration.title = "Configuration";
-            std::string mouse_control_modes[] = {"OFF", "Always", "While button is held", "While button is not held"};
+            std::string mouse_control_modes[] = {"OFF", "Always", "While button is held", "While button is not held", "Toggle"};
+            std::string stick_sensitivity_modifer_modes[] = {"Always", "While button is held", "While button is not held", "Toggle"};
 
             configuration.options = {
                 std::string("Mouse as L-Stick: ") + mouse_control_modes[current_config.mouse_controls_lStick],
+                "Controls L Stick Button: " + keyboard_mouse_vectors_to_string(current_config.kb_controls_lStick_button, current_config.mouse_controls_lStick_button),
                 std::string("Mouse as R-Stick: ") + mouse_control_modes[current_config.mouse_controls_rStick],
+                "Controls R Stick Button: " + keyboard_mouse_vectors_to_string(current_config.kb_controls_rStick_button, current_config.mouse_controls_rStick_button),
                 std::string("Mouse as Gyro: ") + mouse_control_modes[current_config.mouse_controls_gyro],
-                "Mouse Sensitivity: " + std::to_string(current_config.mouse_sensitivity)};
+                "Controls gyro Button: " + keyboard_mouse_vectors_to_string(current_config.kb_controls_gyro_button, current_config.mouse_controls_gyro_button),
+                "L Stick Sensitivity: " + std::to_string(current_config.stick_l_sensitivity),
+                "L Stick Sensitivity Modifer Mode: " + stick_sensitivity_modifer_modes[current_config.stick_l_sensitivity_modifier_mode],
+                "L Stick Sensitivity Modifer Button: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_l_sensitivity_modifier_button, current_config.mouse_stick_l_sensitivity_modifier_button),
+                "R Stick Sensitivity: " + std::to_string(current_config.stick_r_sensitivity),
+                "R Stick Sensitivity Modifer Mode: " + stick_sensitivity_modifer_modes[current_config.stick_r_sensitivity_modifier_mode],
+                "R Stick Sensitivity Modifer Button: " + keyboard_mouse_vectors_to_string(current_config.kb_stick_r_sensitivity_modifier_button, current_config.mouse_stick_r_sensitivity_modifier_button),
+                "Gyro Sensitivity: " + std::to_string(current_config.motion_attributes.sensibility)};
             configuration.instructions = "Enter=toggle/increase|Esc=return|Del=decrease";
 
             show_UiMenu(configuration, gui_selection);

@@ -297,29 +297,49 @@ void load_config_file(FILE* log, Config& config, std::string file_location, std:
             if (key == "stick_r_right")
                 config.kb_stick_r_right = get_keyboard_vector(value, ',');
 
-            if (key == "mouse_sensitivity")
-                config.mouse_sensitivity = std::stof(value);
-
-            if (key == "mouse_controls_gyro")
-                config.mouse_controls_gyro = std::stoi(value);
+            if (key == "mouse_controls_lStick")
+                config.mouse_controls_lStick = std::stoi(value);
 
             if (key == "mouse_controls_rStick")
                 config.mouse_controls_rStick = std::stoi(value);
 
-            if (key == "mouse_controls_lStick")
-                config.mouse_controls_lStick = std::stoi(value);
+            if (key == "mouse_controls_gyro")
+                config.mouse_controls_gyro = std::stoi(value);
 
-            if (key == "controls_gyro_button"){
-                config.kb_controls_gyro_button = get_keyboard_vector(value, ',');
-                config.mouse_controls_gyro_button = get_mouse_vector(value, ',');}
+            if (key == "stick_l_sensitivity")
+                config.stick_l_sensitivity = std::stof(value);
+
+            if (key == "stick_r_sensitivity")
+                config.stick_r_sensitivity = std::stof(value);
+
+            if (key == "gyro_sensitivity")
+                config.motion_attributes.sensibility = std::stof(value);
+
+            if (key == "controls_lStick_button"){
+                config.kb_controls_lStick_button = get_keyboard_vector(value, ',');
+                config.mouse_controls_lStick_button = get_mouse_vector(value, ',');}
 
             if (key == "controls_rStick_button"){
                 config.kb_controls_rStick_button = get_keyboard_vector(value, ',');
                 config.mouse_controls_rStick_button = get_mouse_vector(value, ',');}
 
-            if (key == "controls_lStick_button"){
-                config.kb_controls_lStick_button = get_keyboard_vector(value, ',');
-                config.mouse_controls_lStick_button = get_mouse_vector(value, ',');}
+            if (key == "controls_gyro_button"){
+                config.kb_controls_gyro_button = get_keyboard_vector(value, ',');
+                config.mouse_controls_gyro_button = get_mouse_vector(value, ',');}
+
+            if (key == "stick_l_sensitivity_modifier_mode")
+                config.stick_l_sensitivity_modifier_mode = std::stoi(value);
+
+            if (key == "stick_r_sensitivity_modifier_mode")
+                config.stick_r_sensitivity_modifier_mode = std::stoi(value);
+
+            if (key == "stick_l_sensitivity_modifier_button"){
+                config.kb_stick_l_sensitivity_modifier_button = get_keyboard_vector(value, ',');
+                config.mouse_stick_l_sensitivity_modifier_button = get_mouse_vector(value, ',');}
+
+            if (key == "stick_r_sensitivity_modifier_button"){
+                config.kb_stick_r_sensitivity_modifier_button = get_keyboard_vector(value, ',');
+                config.mouse_stick_r_sensitivity_modifier_button = get_mouse_vector(value, ',');}
         }
     }
     fclose(config_file);
@@ -359,14 +379,22 @@ void rewrite_config_file(std::string file_location, std::vector<ProfileSection> 
         fprintf(config_file, "stick_r_left = K13\n");
         fprintf(config_file, "stick_r_right = K15\n");
 
-        fprintf(config_file, "mouse_controls_gyro = 0\n");
-        fprintf(config_file, "mouse_controls_rStick = 1\n");
         fprintf(config_file, "mouse_controls_lStick = 0\n");
-        fprintf(config_file, "mouse_sensitivity = 1.0\n");
+        fprintf(config_file, "mouse_controls_rStick = 1\n");
+        fprintf(config_file, "mouse_controls_gyro = 0\n");
+        fprintf(config_file, "stick_l_sensitivity = 1.0\n");
+        fprintf(config_file, "stick_r_sensitivity = 1.0\n");
+        fprintf(config_file, "gyro_sensitivity = 1.0\n");
 
         fprintf(config_file, "controls_gyro_button = \n");
         fprintf(config_file, "controls_rStick_button = \n");
         fprintf(config_file, "controls_lStick_button = \n");
+
+        fprintf(config_file, "stick_l_sensitivity_modifier_mode = 0\n");
+        fprintf(config_file, "stick_r_sensitivity_modifier_mode = 0\n");
+
+        fprintf(config_file, "stick_l_sensitivity_modifier_button = \n");
+        fprintf(config_file, "stick_r_sensitivity_modifier_button = \n");
     }
 
     else
@@ -401,14 +429,22 @@ void rewrite_config_file(std::string file_location, std::vector<ProfileSection> 
             fprintf(config_file, "stick_r_left = %s\n", keyboard_mouse_vectors_to_string(PFS.config.kb_stick_r_left).c_str());
             fprintf(config_file, "stick_r_right = %s\n", keyboard_mouse_vectors_to_string(PFS.config.kb_stick_r_right).c_str());
 
-            fprintf(config_file, "mouse_controls_gyro = %s\n", std::to_string(PFS.config.mouse_controls_gyro).c_str());
-            fprintf(config_file, "mouse_controls_rStick = %s\n", std::to_string(PFS.config.mouse_controls_rStick).c_str());
             fprintf(config_file, "mouse_controls_lStick = %s\n", std::to_string(PFS.config.mouse_controls_lStick).c_str());
-            fprintf(config_file, "mouse_sensitivity = %s\n", std::to_string(PFS.config.mouse_sensitivity).c_str());
+            fprintf(config_file, "mouse_controls_rStick = %s\n", std::to_string(PFS.config.mouse_controls_rStick).c_str());
+            fprintf(config_file, "mouse_controls_gyro = %s\n", std::to_string(PFS.config.mouse_controls_gyro).c_str());
+            fprintf(config_file, "stick_l_sensitivity = %s\n", std::to_string(PFS.config.stick_l_sensitivity).c_str());
+            fprintf(config_file, "stick_r_sensitivity = %s\n", std::to_string(PFS.config.stick_r_sensitivity).c_str());
+            fprintf(config_file, "gyro_sensitivity = %s\n", std::to_string(PFS.config.motion_attributes.sensibility).c_str());
 
             fprintf(config_file, "controls_gyro_button = %s\n", keyboard_mouse_vectors_to_string(PFS.config.kb_controls_gyro_button, PFS.config.mouse_controls_gyro_button).c_str());
             fprintf(config_file, "controls_rStick_button = %s\n", keyboard_mouse_vectors_to_string(PFS.config.kb_controls_rStick_button, PFS.config.mouse_controls_rStick_button).c_str());
             fprintf(config_file, "controls_lStick_button = %s\n", keyboard_mouse_vectors_to_string(PFS.config.kb_controls_lStick_button, PFS.config.mouse_controls_lStick_button).c_str());
+
+            fprintf(config_file, "stick_l_sensitivity_modifier_mode = %s\n", std::to_string(PFS.config.stick_l_sensitivity_modifier_mode).c_str());
+            fprintf(config_file, "stick_r_sensitivity_modifier_mode = %s\n", std::to_string(PFS.config.stick_r_sensitivity_modifier_mode).c_str());
+
+            fprintf(config_file, "stick_l_sensitivity_modifier_button = %s\n", keyboard_mouse_vectors_to_string(PFS.config.kb_stick_l_sensitivity_modifier_button, PFS.config.mouse_stick_l_sensitivity_modifier_button).c_str());
+            fprintf(config_file, "stick_r_sensitivity_modifier_button = %s\n", keyboard_mouse_vectors_to_string(PFS.config.kb_stick_r_sensitivity_modifier_button, PFS.config.mouse_stick_r_sensitivity_modifier_button).c_str());
         }
     }
 
@@ -434,7 +470,7 @@ void map_config_kbm_struct(std::vector<HidKeyboardKey>& keys, std::vector<HidMou
             keys.pop_back();
 
     }
-}
+};
 
 void map_config_kb_struct(std::vector<HidKeyboardKey>& keys,
     HidKeyboardKey key_received, HidMouseButton button_received, ManagerActions& map_actions)
@@ -517,4 +553,12 @@ void load_gamepads_file(FILE* file, VirtualDevice_K2C gamepads[4])
             }
         }
     }
-}
+};
+
+bool justPressed(bool pressed, bool& wasPressed)
+{
+    bool result = pressed && !wasPressed;
+    wasPressed = pressed;
+
+    return result;
+};

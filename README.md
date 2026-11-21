@@ -11,7 +11,7 @@
 * Play any Switch game with a USB keyboard and mouse
 * Map any KB&M key/button to gamepad buttons or sticks using the key2con Homebrew
 * Mapping profiles per game
-* Experimental gyro/R-stick-as-mouse/L-stick-as-mouse support
+* Experimental mouse-as-gyro/R-stick/L-stick support
 
 > The ***key2con sysmodule*** has a ***1ms update loop***.
 
@@ -92,7 +92,13 @@ mouse_controls_lStick =
 controls_gyro_button =
 controls_rStick_button =
 controls_lStick_button =
-mouse_sensitivity =
+stick_l_sensitivity =
+stick_r_sensitivity =
+gyro_sensitivity =
+stick_l_sensitivity_modifier_mode =
+stick_r_sensitivity_modifier_mode =
+stick_l_sensitivity_modifier_button =
+stick_r_sensitivity_modifier_button =
 ```
 
 To create a game-specific configuration, add a new section named after the game's Title ID.
@@ -103,12 +109,22 @@ To create a game-specific configuration, add a new section named after the game'
 
 To map multiple keys and buttons, simply list them using a comma (`,`) without spaces.
 
-To set some mouse configs, use: `0`, `1`, `2` or `3`.
+To set sensitivity settings, use a period instead of a comma as the decimal separator, like `1.5`.
+
+To set other settings, use: `0`, `1`, `2`, `3` or `4`.
 
 * `0` - OFF
 * `1` - Always
 * `2` - While button is held
 * `3` - While button is not held
+* `4` - Toggle
+
+The stick sensitivity modifier mode settings don't have an OFF option, so use the following values:
+
+* `0` - Always
+* `1` - While button is held
+* `2` - While button is not held
+* `3` - Toggle
 
 Example:
 
@@ -156,16 +172,10 @@ make
 
 If the build is successful, a file called `key2con_manager.nro` will be created in the folder. Place it in the Homebrew build output folder, overwriting files if prompted.
 
-Repeat the process in the sysmodule folder. If the build is successful, a file called `key2con_sysmodule.nsp` will be created.
+Repeat the process in the sysmodule folder. If the build is successful, a file called `exefs.nsp` will be created. Place it in the sysmodule build output folder, always overwriting files if prompted.
 
-Rename it to `exefs.nsp` and place it in the sysmodule build output folder, always overwriting files if prompted.
-
-Copy the sysmodule build output to `release/atmosphere/contents/` and copy the `key2con_manager.nro` file to `/release/switch/key2con/`.
+Copy the sysmodule build output to `release/atmosphere/contents/41000000000E2C00/` and copy the `key2con_manager.nro` file to `/release/switch/key2con/`.
 
 Now copy everything inside `release/` to the root of your SD card!
 
 Reboot your Nintendo Switch, or turn it on if it's powered off. Make sure the sysmodule is set to Auto Start.
-
-# 📜 License
-
-This project is licensed under the [MIT License](LICENSE).
